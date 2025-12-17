@@ -33,6 +33,7 @@ export interface AppEvent {
   image: string;
   phone: string; // Contact number for reservations
   status: 'pending' | 'approved'; // New field for approval workflow
+  isPromoted?: boolean; // New field for monetization (Premium events)
 }
 
 // For the UI simulation of "Venue Accounts"

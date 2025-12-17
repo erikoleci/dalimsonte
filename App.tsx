@@ -24,7 +24,8 @@ const INITIAL_EVENTS: AppEvent[] = [
     price: '10€',
     image: 'https://images.unsplash.com/photo-1570125909232-eb263c188f7e?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80',
     phone: '+355691234567',
-    status: 'approved'
+    status: 'approved',
+    isPromoted: true // Premium event example
   },
   {
     id: '2',
@@ -139,7 +140,8 @@ function App() {
     description: '',
     price: 'Falas',
     phone: '',
-    files: [] as string[] 
+    files: [] as string[],
+    wantPromotion: false
   });
   const [promoLoading, setPromoLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -217,6 +219,8 @@ function App() {
         const isApproved = event.status === 'approved';
         return matchCity && matchDate && matchType && isApproved;
       });
+      // Sort: Promoted events first
+      results.sort((a, b) => (b.isPromoted ? 1 : 0) - (a.isPromoted ? 1 : 0));
       setSearchResults(results);
       setLoading(false);
     }, 500);
@@ -242,7 +246,8 @@ function App() {
       price: venueForm.price,
       phone: venueForm.phone || '+355 69 XX XX XXX',
       image: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80',
-      status: 'pending' // Default status is pending
+      status: 'pending', // Default status is pending
+      isPromoted: venueForm.wantPromotion
     };
 
     setAllEvents(prev => [newEvent, ...prev]);
@@ -260,7 +265,8 @@ function App() {
         description: '',
         price: 'Falas',
         phone: '',
-        files: []
+        files: [],
+        wantPromotion: false
       });
   };
 
@@ -287,14 +293,14 @@ function App() {
     }
   };
 
-  const handleApproveEvent = (id: string) => {
+  const handleApproveEvent = (id: string, promote = false) => {
     setAllEvents(prev => prev.map(e => {
         if (e.id === id) {
-            return { ...e, status: 'approved' };
+            return { ...e, status: 'approved', isPromoted: promote ? true : e.isPromoted };
         }
         return e;
     }));
-    addNotification('Eventi u miratua dhe është LIVE!', 'success');
+    addNotification(promote ? 'Eventi u miratua dhe u SPONSORIZUA!' : 'Eventi u miratua dhe është LIVE!', 'success');
   };
 
   const handleAdminLogout = () => {
@@ -368,9 +374,16 @@ function App() {
                 </button>
 
                 <div className="absolute bottom-0 left-0 p-6 md:p-10 w-full">
-                    <span className="inline-block px-3 py-1 bg-night-accent text-white text-xs font-bold rounded-full mb-3 uppercase tracking-wide shadow-lg">
-                        {selectedEvent.type}
-                    </span>
+                    <div className="flex flex-wrap gap-2 mb-3">
+                        <span className="inline-block px-3 py-1 bg-night-accent text-white text-xs font-bold rounded-full uppercase tracking-wide shadow-lg">
+                            {selectedEvent.type}
+                        </span>
+                        {selectedEvent.isPromoted && (
+                            <span className="inline-block px-3 py-1 bg-gradient-to-r from-yellow-400 to-orange-500 text-black text-xs font-bold rounded-full uppercase tracking-wide shadow-lg">
+                                💎 Premium
+                            </span>
+                        )}
+                    </div>
                     <h1 className="text-3xl md:text-5xl font-bold text-white leading-tight mb-2 shadow-black drop-shadow-lg">
                         {selectedEvent.name}
                     </h1>
@@ -475,7 +488,7 @@ function App() {
 
         <div className="mt-16 md:mt-20 grid grid-cols-2 md:grid-cols-4 gap-4 opacity-80">
           {[
-            { icon: '🍹', label: 'Kokteile' },
+            { icon: '💎', label: 'Premium Events' },
             { icon: '💃', label: 'Latino' },
             { icon: '🎉', label: 'Party' },
             { icon: '🎧', label: 'Techno' }
@@ -503,7 +516,7 @@ function App() {
         <div 
         key={event.id} 
         onClick={() => setSelectedEvent(event)}
-        className="bg-night-card rounded-2xl overflow-hidden border border-white/5 shadow-xl hover:shadow-2xl hover:border-night-accent/30 transition group flex flex-col cursor-pointer active:scale-[0.98] relative"
+        className={`bg-night-card rounded-2xl overflow-hidden border shadow-xl hover:shadow-2xl transition group flex flex-col cursor-pointer active:scale-[0.98] relative ${event.isPromoted ? 'border-night-gold/50 shadow-night-gold/10' : 'border-white/5 hover:border-night-accent/30'}`}
         >
             <div className="h-48 overflow-hidden relative">
                 <img src={event.image} alt={event.name} className="w-full h-full object-cover group-hover:scale-110 transition duration-700" />
@@ -515,14 +528,32 @@ function App() {
                      ⚠️ Pending
                  </div>
                 )}
-                <button 
-                    onClick={(e) => toggleSaveEvent(e, event)}
-                    className="absolute top-4 left-4 w-8 h-8 rounded-full bg-black/40 backdrop-blur flex items-center justify-center text-sm hover:bg-black/60 transition"
-                >
-                    {isSaved ? '❤️' : '🤍'}
-                </button>
+                {event.isPromoted && (
+                    <div className="absolute top-0 left-0 w-full overflow-hidden">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-yellow-400 via-orange-500 to-yellow-400 animate-shine"></div>
+                        <div className="absolute top-4 left-4 bg-gradient-to-r from-yellow-400 to-orange-500 text-black text-xs font-bold px-3 py-1 rounded-full shadow-lg flex items-center gap-1">
+                            💎 Sponsorizuar
+                        </div>
+                    </div>
+                )}
+                {!event.isPromoted && (
+                    <button 
+                        onClick={(e) => toggleSaveEvent(e, event)}
+                        className="absolute top-4 left-4 w-8 h-8 rounded-full bg-black/40 backdrop-blur flex items-center justify-center text-sm hover:bg-black/60 transition"
+                    >
+                        {isSaved ? '❤️' : '🤍'}
+                    </button>
+                )}
+                 {event.isPromoted && (
+                    <button 
+                        onClick={(e) => toggleSaveEvent(e, event)}
+                        className="absolute top-4 right-20 w-8 h-8 rounded-full bg-black/40 backdrop-blur flex items-center justify-center text-sm hover:bg-black/60 transition"
+                    >
+                        {isSaved ? '❤️' : '🤍'}
+                    </button>
+                )}
             </div>
-            <div className="p-6 flex-1 flex flex-col">
+            <div className={`p-6 flex-1 flex flex-col ${event.isPromoted ? 'bg-gradient-to-b from-night-gold/5 to-transparent' : ''}`}>
                 <h4 className="text-xl font-bold text-white leading-tight mb-2">{event.name}</h4>
                 <div className="flex items-center gap-2 text-night-accent text-sm font-semibold mb-3">
                     <span>📍 {event.venue}</span>
@@ -530,7 +561,7 @@ function App() {
                 <p className="text-gray-400 text-sm line-clamp-3 mb-4 flex-1">{event.description}</p>
                 <div className="flex items-center justify-between pt-4 border-t border-white/5">
                     <span className="text-xs text-gray-500 font-medium uppercase">{event.type}</span>
-                    <button className="text-white bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg text-sm font-medium transition active:scale-95">
+                    <button className={`px-4 py-2 rounded-lg text-sm font-medium transition active:scale-95 ${event.isPromoted ? 'bg-night-gold text-black hover:bg-yellow-300' : 'text-white bg-white/10 hover:bg-white/20'}`}>
                         Shiko Detajet
                     </button>
                 </div>
@@ -742,6 +773,23 @@ function App() {
                         <div className="flex gap-2 flex-wrap mt-2">{venueForm.files.map((f, i) => (<span key={i} className="text-xs bg-slate-700 px-2 py-1 rounded text-gray-300">{f}</span>))}</div>
                         )}
                 </div>
+                
+                {/* Monetization Feature in Form */}
+                <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/30 p-4 rounded-xl">
+                    <label className="flex items-center space-x-3 cursor-pointer">
+                        <input 
+                            type="checkbox" 
+                            checked={venueForm.wantPromotion}
+                            onChange={(e) => setVenueForm({...venueForm, wantPromotion: e.target.checked})}
+                            className="w-5 h-5 accent-yellow-500 rounded focus:ring-2 focus:ring-yellow-500"
+                        />
+                        <div>
+                            <span className="font-bold text-yellow-500 text-sm block">🚀 Sponsorizo Eventin (Premium)</span>
+                            <span className="text-xs text-gray-400">Eventi juaj do të shfaqet në krye dhe do të ketë etiketën "Premium". (+1000 LEK)</span>
+                        </div>
+                    </label>
+                </div>
+
                 <div>
                    <div className="flex justify-between items-center mb-2">
                      <label className="block text-sm font-medium text-gray-300">Përshkrimi</label>
@@ -761,7 +809,13 @@ function App() {
              <p className="text-gray-300 mb-8 max-w-md leading-relaxed">
                 Eventi juaj <span className="text-white font-bold">"{venueForm.eventName}"</span> u ruajt në sistem.
                 <br /><br />
-                Për ta bërë <span className="text-night-accent font-bold">LIVE</span>, ju lutem kontaktoni adminin për pagesën.
+                {venueForm.wantPromotion ? (
+                    <span className="block bg-yellow-500/10 p-2 rounded text-yellow-400 text-sm mt-2 border border-yellow-500/20">
+                        Ke zgjedhur paketën Premium! Kontakto adminin për aktivizim të menjëhershëm.
+                    </span>
+                ) : (
+                    "Për ta bërë LIVE, ju lutem prisni miratimin e adminit."
+                )}
              </p>
              
              <div className="bg-white/5 border border-white/10 rounded-xl p-6 w-full max-w-sm mb-8">
@@ -841,10 +895,11 @@ function App() {
                         </div>
                     </div>
                     <div className="bg-night-card p-6 rounded-2xl border border-white/5">
-                        <div className="text-gray-400 mb-1 text-sm font-medium">Active (Live)</div>
+                        <div className="text-gray-400 mb-1 text-sm font-medium">Fitimet (Sot)</div>
                         <div className="text-3xl md:text-4xl font-bold text-green-500">
-                             {allEvents.filter(e => e.status === 'approved').length}
+                             {allEvents.filter(e => e.status === 'approved' && e.isPromoted).length * 10}€
                         </div>
+                        <div className="text-xs text-gray-500 mt-1">*Bazuar në eventet premium</div>
                     </div>
                     <div className="bg-night-card p-6 rounded-2xl border border-white/5">
                          <div className="text-gray-400 mb-1 text-sm font-medium">Total Evente</div>
@@ -878,15 +933,23 @@ function App() {
                                                         ⏳ Pending
                                                     </span>
                                                 ) : (
-                                                    <span className="bg-green-500/20 text-green-400 px-3 py-1 rounded-full text-xs font-bold border border-green-500/30">
-                                                        ✅ Live
-                                                    </span>
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className="bg-green-500/20 text-green-400 px-3 py-1 rounded-full text-xs font-bold border border-green-500/30 w-fit">
+                                                            ✅ Live
+                                                        </span>
+                                                        {event.isPromoted && (
+                                                            <span className="text-[10px] text-yellow-500 font-bold uppercase tracking-wider">💎 Premium</span>
+                                                        )}
+                                                    </div>
                                                 )}
                                             </td>
                                             <td className="py-4 px-4">
                                                 <div className="flex items-center gap-3">
                                                     <img src={event.image} className="w-10 h-10 rounded-lg object-cover bg-gray-700" alt="" />
-                                                    <span className="font-bold text-white text-sm">{event.name}</span>
+                                                    <span className="font-bold text-white text-sm">
+                                                        {event.name}
+                                                        {event.isPromoted && event.status === 'pending' && <span className="text-yellow-500 ml-2">💎</span>}
+                                                    </span>
                                                 </div>
                                             </td>
                                             <td className="py-4 px-4">
@@ -898,20 +961,29 @@ function App() {
                                             <td className="py-4 px-4 text-right">
                                                 <div className="flex items-center justify-end gap-2">
                                                     {event.status === 'pending' && (
-                                                        <button 
-                                                            onClick={() => handleApproveEvent(event.id)}
-                                                            className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition shadow-lg shadow-green-900/30"
-                                                            title="Konfirmo Pagesën & Publiko"
-                                                        >
-                                                            Aprovo (Paguar)
-                                                        </button>
+                                                        <>
+                                                            <button 
+                                                                onClick={() => handleApproveEvent(event.id, false)}
+                                                                className="bg-green-600 hover:bg-green-500 text-white px-3 py-2 rounded-lg text-xs font-bold transition shadow-lg"
+                                                                title="Konfirmo Thjesht"
+                                                            >
+                                                                Ok
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => handleApproveEvent(event.id, true)}
+                                                                className="bg-yellow-600 hover:bg-yellow-500 text-white px-3 py-2 rounded-lg text-xs font-bold transition shadow-lg border border-yellow-400/50"
+                                                                title="Konfirmo si Premium (Paguar)"
+                                                            >
+                                                                💎 Ok
+                                                            </button>
+                                                        </>
                                                     )}
                                                     <button 
                                                         onClick={() => handleDeleteEvent(event.id)}
                                                         className="bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white px-3 py-2 rounded-lg text-xs font-bold transition duration-300 border border-red-500/30"
                                                         title="Refuzo / Tërhiq"
                                                     >
-                                                        🗑️ Fshi
+                                                        🗑️
                                                     </button>
                                                 </div>
                                             </td>
