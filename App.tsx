@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { generatePromoDescription } from './services/geminiService';
+import { db } from './services/supabase';
 import { AppEvent, AppNotification } from './types';
 import ReactMarkdown from 'react-markdown';
 
@@ -11,7 +12,6 @@ const getTodayString = () => {
   return new Date().toISOString().split('T')[0];
 };
 
-// Mock Data - Used only if LocalStorage is empty
 const INITIAL_EVENTS: AppEvent[] = [
   {
     id: '1',
@@ -25,7 +25,7 @@ const INITIAL_EVENTS: AppEvent[] = [
     image: 'https://images.unsplash.com/photo-1570125909232-eb263c188f7e?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80',
     phone: '+355691234567',
     status: 'approved',
-    isPromoted: true // Premium event example
+    isPromoted: true 
   },
   {
     id: '2',
@@ -38,19 +38,6 @@ const INITIAL_EVENTS: AppEvent[] = [
     price: 'Falas',
     image: 'https://images.unsplash.com/photo-1514525253440-b393452e8d26?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80',
     phone: '+355692223333',
-    status: 'approved'
-  },
-  {
-    id: '3',
-    name: 'Summer Vibes - Vlora',
-    venue: 'Coco Bongo',
-    city: 'Vlorë',
-    date: getTodayString(),
-    type: 'Latino',
-    description: 'Festa buzë detit fillon sonte! Reggaeton dhe Latino gjithë natën.',
-    price: '500 LEK',
-    image: 'https://images.unsplash.com/photo-1533174072545-e8d4aa97edf9?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80',
-    phone: '+355694445555',
     status: 'approved'
   }
 ];
@@ -78,20 +65,11 @@ const NotificationToast = ({ notifications }: { notifications: AppNotification[]
 function App() {
   const [view, setView] = useState<ViewState>('landing');
   
-  // --- Persistent State Initialization ---
+  // --- State Initialization ---
+  const [allEvents, setAllEvents] = useState<AppEvent[]>([]);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
-  // 1. Load Events
-  const [allEvents, setAllEvents] = useState<AppEvent[]>(() => {
-    try {
-      const saved = localStorage.getItem('kudalim_events');
-      return saved ? JSON.parse(saved) : INITIAL_EVENTS;
-    } catch (e) {
-      console.error("Error loading events", e);
-      return INITIAL_EVENTS;
-    }
-  });
-
-  // 2. Load Saved Favorites
+  // Load Saved Favorites
   const [savedEventIds, setSavedEventIds] = useState<Set<string>>(() => {
     try {
       const saved = localStorage.getItem('kudalim_favorites');
@@ -101,7 +79,7 @@ function App() {
     }
   });
 
-  // 3. Load Subscriptions
+  // Load Subscriptions
   const [subscriptions, setSubscriptions] = useState<Set<string>>(() => {
     try {
       const saved = localStorage.getItem('kudalim_subscriptions');
@@ -113,8 +91,6 @@ function App() {
 
   const [selectedEvent, setSelectedEvent] = useState<AppEvent | null>(null);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
-
-  // PWA Install Prompt State
   const [installPrompt, setInstallPrompt] = useState<any>(null);
 
   // Admin State
@@ -149,31 +125,48 @@ function App() {
   const [promoLoading, setPromoLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // --- Effects for Persistence ---
+  // --- Effects ---
 
-  // Save Events whenever they change
+  // Main Fetch Function
+  const fetchEvents = async (silent = false) => {
+    const events = await db.getEvents();
+    if (events.length === 0 && !db.isConnected()) {
+        setAllEvents(INITIAL_EVENTS);
+    } else {
+        // We do NOT filter by date here completely, so Admin can see old ones if needed, 
+        // but for performance we might want to. For now, let's keep all.
+        setAllEvents(events);
+    }
+    if (!silent) setDataLoaded(true);
+  };
+
+  // Initial Fetch & Real-time Subscription
   useEffect(() => {
-    localStorage.setItem('kudalim_events', JSON.stringify(allEvents));
-  }, [allEvents]);
+    fetchEvents();
 
-  // Save Favorites whenever they change
+    // Subscribe to real-time changes
+    const channel = db.subscribeToEvents(() => {
+        addNotification("Të dhëna të reja u gjetën! Rifreskim...", "info");
+        fetchEvents(true);
+    });
+
+    return () => {
+        if (channel && typeof channel.unsubscribe === 'function') {
+            channel.unsubscribe();
+        }
+    };
+  }, []);
+
+  // Persist Favorites & Subs
   useEffect(() => {
     localStorage.setItem('kudalim_favorites', JSON.stringify(Array.from(savedEventIds)));
   }, [savedEventIds]);
 
-  // Save Subscriptions whenever they change
   useEffect(() => {
     localStorage.setItem('kudalim_subscriptions', JSON.stringify(Array.from(subscriptions)));
   }, [subscriptions]);
 
-  // Automatic Cleanup Effect (runs on mount)
-  useEffect(() => {
-    // Automatically delete events where date < today
-    const today = getTodayString();
-    setAllEvents(prevEvents => prevEvents.filter(event => event.date >= today));
-  }, []);
-
-  // PWA Install Listener
+  // PWA
   useEffect(() => {
     const handler = (e: any) => {
       e.preventDefault();
@@ -228,11 +221,9 @@ function App() {
   };
 
   // --- Handlers ---
-
   const handleSearch = () => {
     setLoading(true);
     setHasSearched(true);
-    
     setTimeout(() => {
       const results = allEvents.filter(event => {
         const matchCity = event.city === searchParams.city;
@@ -241,7 +232,6 @@ function App() {
         const isApproved = event.status === 'approved';
         return matchCity && matchDate && matchType && isApproved;
       });
-      // Sort: Promoted events first
       results.sort((a, b) => (b.isPromoted ? 1 : 0) - (a.isPromoted ? 1 : 0));
       setSearchResults(results);
       setLoading(false);
@@ -256,7 +246,7 @@ function App() {
     setPromoLoading(false);
   };
 
-  const handleSubmitEvent = () => {
+  const handleSubmitEvent = async () => {
     const newEvent: AppEvent = {
       id: Math.random().toString(36).substr(2, 9),
       name: venueForm.eventName || 'Event Special',
@@ -268,12 +258,18 @@ function App() {
       price: venueForm.price,
       phone: venueForm.phone || '+355 69 XX XX XXX',
       image: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80',
-      status: 'pending', // Default status is pending
+      status: 'pending',
       isPromoted: venueForm.wantPromotion
     };
 
+    // Optimistic Update is risky with cross-device if not connected, 
+    // but useful for immediate feedback on current device.
     setAllEvents(prev => [newEvent, ...prev]);
-    setVenueStep('success'); // Go to success/info screen instead of payment
+    
+    const success = await db.addEvent(newEvent);
+    if(success) {
+        setVenueStep('success');
+    }
   };
 
   const resetVenueForm = () => {
@@ -303,25 +299,31 @@ function App() {
     if (adminPass === 'admin123') {
       setIsAuthenticated(true);
       setLoginError('');
+      // Fetch immediate to be sure
+      fetchEvents();
     } else {
       setLoginError('Fjalëkalimi i pasaktë');
     }
   };
 
-  const handleDeleteEvent = (id: string) => {
+  const handleDeleteEvent = async (id: string) => {
     if (confirm('Je i sigurt që dëshiron të fshish këtë event?')) {
+      // Optimistic delete
       setAllEvents(prev => prev.filter(e => e.id !== id));
+      await db.deleteEvent(id);
       addNotification('Eventi u fshi.', 'info');
     }
   };
 
-  const handleApproveEvent = (id: string, promote = false) => {
+  const handleApproveEvent = async (id: string, promote = false) => {
+    // Optimistic update
     setAllEvents(prev => prev.map(e => {
         if (e.id === id) {
             return { ...e, status: 'approved', isPromoted: promote ? true : e.isPromoted };
         }
         return e;
     }));
+    await db.updateEventStatus(id, 'approved', promote);
     addNotification(promote ? 'Eventi u miratua dhe u SPONSORIZUA!' : 'Eventi u miratua dhe është LIVE!', 'success');
   };
 
@@ -547,6 +549,11 @@ function App() {
             className="fixed bottom-0 right-0 w-10 h-10 z-50 cursor-default"
             aria-hidden="true"
         />
+
+        {/* Database Connection Indicator */}
+        <div className={`fixed bottom-2 right-2 px-2 py-1 rounded-full text-[10px] font-mono font-bold z-40 pointer-events-none opacity-50 ${db.isConnected() ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'}`}>
+            {db.isConnected() ? 'DB: LINKED' : 'DB: LOCAL (NO SYNC)'}
+        </div>
       </div>
     </div>
   );
@@ -815,18 +822,29 @@ function App() {
                         )}
                 </div>
                 
-                {/* Monetization Feature in Form */}
-                <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/30 p-4 rounded-xl">
-                    <label className="flex items-center space-x-3 cursor-pointer">
-                        <input 
-                            type="checkbox" 
-                            checked={venueForm.wantPromotion}
-                            onChange={(e) => setVenueForm({...venueForm, wantPromotion: e.target.checked})}
-                            className="w-5 h-5 accent-yellow-500 rounded focus:ring-2 focus:ring-yellow-500"
-                        />
-                        <div>
-                            <span className="font-bold text-yellow-500 text-sm block">🚀 Sponsorizo Eventin (Premium)</span>
-                            <span className="text-xs text-gray-400">Eventi juaj do të shfaqet në krye dhe do të ketë etiketën "Premium". (+1000 LEK)</span>
+                {/* Enhanced Monetization Feature UI */}
+                <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/30 p-4 rounded-xl relative overflow-hidden group hover:border-yellow-500/50 transition-colors">
+                    <div className="absolute top-0 right-0 bg-yellow-500 text-black text-[10px] font-bold px-2 py-1 rounded-bl-lg shadow-sm">
+                        REKOMANDOHET 🚀
+                    </div>
+                    <label className="flex items-center space-x-4 cursor-pointer relative z-10">
+                        <div className="relative">
+                            <input 
+                                type="checkbox" 
+                                checked={venueForm.wantPromotion}
+                                onChange={(e) => setVenueForm({...venueForm, wantPromotion: e.target.checked})}
+                                className="peer sr-only"
+                            />
+                            <div className="w-6 h-6 border-2 border-yellow-500 rounded bg-transparent peer-checked:bg-yellow-500 transition-all flex items-center justify-center">
+                                <span className="text-black font-bold text-sm opacity-0 peer-checked:opacity-100">✓</span>
+                            </div>
+                        </div>
+                        <div className="flex-1">
+                            <span className="font-bold text-yellow-400 text-lg block mb-0.5">Sponsorizo Eventin (Premium)</span>
+                            <span className="text-xs text-gray-300 block leading-tight">
+                                Shfaq eventin në krye, etiketoje si "Premium" dhe merr 3x më shumë rezervime.
+                                <span className="block mt-1 font-bold text-yellow-500">+1000 LEK / Event</span>
+                            </span>
                         </div>
                     </label>
                 </div>
@@ -851,8 +869,9 @@ function App() {
                 Eventi juaj <span className="text-white font-bold">"{venueForm.eventName}"</span> u ruajt në sistem.
                 <br /><br />
                 {venueForm.wantPromotion ? (
-                    <span className="block bg-yellow-500/10 p-2 rounded text-yellow-400 text-sm mt-2 border border-yellow-500/20">
-                        Ke zgjedhur paketën Premium! Kontakto adminin për aktivizim të menjëhershëm.
+                    <span className="block bg-yellow-500/10 p-4 rounded-xl text-yellow-400 text-sm mt-2 border border-yellow-500/20 shadow-lg shadow-yellow-900/10">
+                        💎 <strong>Kërkesë Premium!</strong><br/>
+                        Ju lutem transferoni pagesën dhe kontaktoni adminin për aktivizim të menjëhershëm.
                     </span>
                 ) : (
                     "Për ta bërë LIVE, ju lutem prisni miratimin e adminit."
@@ -917,7 +936,17 @@ function App() {
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                      <div>
                          <h2 className="text-2xl md:text-3xl font-bold text-white">Dashboard</h2>
-                         <p className="text-gray-400 text-sm">Menaxhimi i Eventeve dhe Pagesave</p>
+                         <p className="text-gray-400 text-sm mt-1">
+                            {db.isConnected() ? (
+                                <span className="text-green-400 flex items-center gap-1 font-mono">
+                                    🟢 Online <span className="text-gray-600">|</span> ID: {db.getProjectID().substring(0,6)}...
+                                </span>
+                            ) : (
+                                <span className="text-orange-400 flex items-center gap-1">
+                                    🟠 Offline (Lokale) <span className="text-gray-500 text-xs">- Mungon API Key në .env</span>
+                                </span>
+                            )}
+                         </p>
                      </div>
                      <button 
                         onClick={handleAdminLogout} 
@@ -935,12 +964,16 @@ function App() {
                              {allEvents.filter(e => e.status === 'pending').length}
                         </div>
                     </div>
-                    <div className="bg-night-card p-6 rounded-2xl border border-white/5">
-                        <div className="text-gray-400 mb-1 text-sm font-medium">Fitimet (Sot)</div>
+                    <div className="bg-night-card p-6 rounded-2xl border border-white/5 relative overflow-hidden">
+                         <div className="absolute top-0 right-0 p-4 opacity-10 text-6xl">💰</div>
+                        <div className="text-gray-400 mb-1 text-sm font-medium">Fitimet e Pritshme</div>
                         <div className="text-3xl md:text-4xl font-bold text-green-500">
-                             {allEvents.filter(e => e.status === 'approved' && e.isPromoted).length * 10}€
+                             {allEvents.filter(e => e.isPromoted).length * 1000} LEK
                         </div>
-                        <div className="text-xs text-gray-500 mt-1">*Bazuar në eventet premium</div>
+                        <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                            <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                            {allEvents.filter(e => e.isPromoted && e.status === 'approved').length} evente të paguara
+                        </div>
                     </div>
                     <div className="bg-night-card p-6 rounded-2xl border border-white/5">
                          <div className="text-gray-400 mb-1 text-sm font-medium">Total Evente</div>
@@ -950,7 +983,9 @@ function App() {
 
                 <div className="bg-night-card rounded-3xl p-4 md:p-8 border border-white/5 shadow-2xl overflow-hidden">
                     <h3 className="text-xl font-bold text-white mb-6">Lista e Eventeve</h3>
-                    <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
+                    
+                    {/* Desktop View Table */}
+                    <div className="hidden md:block overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
                         <table className="w-full text-left border-collapse min-w-[800px]">
                             <thead>
                                 <tr className="border-b border-gray-700 text-gray-500 text-xs uppercase tracking-wider">
@@ -1033,6 +1068,73 @@ function App() {
                                 )}
                             </tbody>
                         </table>
+                    </div>
+
+                    {/* Mobile View Cards */}
+                    <div className="md:hidden flex flex-col gap-4">
+                        {allEvents.length === 0 ? (
+                            <div className="py-8 text-center text-gray-500 italic">Asnjë event nuk është në sistem.</div>
+                        ) : (
+                            allEvents.sort((a,b) => (a.status === 'pending' ? -1 : 1)).map(event => (
+                                <div key={event.id} className={`p-4 rounded-xl border border-white/5 flex flex-col gap-3 ${event.status === 'pending' ? 'bg-yellow-500/5' : 'bg-white/5'}`}>
+                                    <div className="flex justify-between items-start">
+                                        <div className="flex items-center gap-3">
+                                            <img src={event.image} className="w-12 h-12 rounded-lg object-cover bg-gray-700" alt="" />
+                                            <div>
+                                                <h4 className="text-white font-bold text-sm">{event.name}</h4>
+                                                <div className="text-xs text-gray-400">{event.venue}</div>
+                                            </div>
+                                        </div>
+                                        {event.status === 'pending' ? (
+                                            <span className="bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded text-[10px] font-bold border border-yellow-500/30 uppercase">
+                                                Pending
+                                            </span>
+                                        ) : (
+                                            <span className="bg-green-500/20 text-green-400 px-2 py-0.5 rounded text-[10px] font-bold border border-green-500/30 uppercase">
+                                                Live
+                                            </span>
+                                        )}
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-2 gap-2 text-xs text-gray-400">
+                                        <div>📅 {event.date}</div>
+                                        <div>📞 {event.phone}</div>
+                                        <div className="col-span-2">💰 {event.price}</div>
+                                    </div>
+
+                                    {event.isPromoted && (
+                                        <div className="text-[10px] text-yellow-500 font-bold uppercase tracking-wider border border-yellow-500/20 bg-yellow-500/5 px-2 py-1 rounded w-fit">
+                                            💎 Premium Request
+                                        </div>
+                                    )}
+
+                                    <div className="flex gap-2 pt-2 border-t border-white/5 mt-1">
+                                         {event.status === 'pending' && (
+                                            <>
+                                                <button 
+                                                    onClick={() => handleApproveEvent(event.id, false)}
+                                                    className="flex-1 bg-green-600 text-white py-2 rounded-lg text-xs font-bold"
+                                                >
+                                                    Ok
+                                                </button>
+                                                <button 
+                                                    onClick={() => handleApproveEvent(event.id, true)}
+                                                    className="flex-1 bg-yellow-600 text-white py-2 rounded-lg text-xs font-bold"
+                                                >
+                                                    💎 Ok
+                                                </button>
+                                            </>
+                                        )}
+                                        <button 
+                                            onClick={() => handleDeleteEvent(event.id)}
+                                            className="px-4 bg-red-500/20 text-red-500 py-2 rounded-lg text-xs font-bold"
+                                        >
+                                            🗑️
+                                        </button>
+                                    </div>
+                                </div>
+                            ))
+                        )}
                     </div>
                 </div>
             </div>
