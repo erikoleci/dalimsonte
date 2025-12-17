@@ -114,6 +114,9 @@ function App() {
   const [selectedEvent, setSelectedEvent] = useState<AppEvent | null>(null);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
 
+  // PWA Install Prompt State
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+
   // Admin State
   const [adminPass, setAdminPass] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -169,6 +172,25 @@ function App() {
     const today = getTodayString();
     setAllEvents(prevEvents => prevEvents.filter(event => event.date >= today));
   }, []);
+
+  // PWA Install Listener
+  useEffect(() => {
+    const handler = (e: any) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setInstallPrompt(null);
+    }
+  };
 
   // --- Notification Logic ---
   const addNotification = (message: string, type: 'success' | 'info' | 'warning' = 'success') => {
@@ -326,6 +348,15 @@ function App() {
       </div>
       
       <div className="flex items-center gap-2">
+         {installPrompt && (
+            <button
+              onClick={handleInstallClick}
+              className="bg-white/10 hover:bg-white/20 text-white px-3 py-2 rounded-xl text-sm font-bold border border-white/20 animate-pulse hidden sm:block"
+            >
+              📲 Instalo
+            </button>
+         )}
+
          {view !== 'admin' && (
              <button 
                 onClick={() => setView('saved')}
@@ -478,12 +509,22 @@ function App() {
           >
             Gjej Ku Të Dalësh 🚀
           </button>
-          <button 
-             onClick={() => setView('venue')}
-            className="w-full sm:w-auto px-8 py-4 bg-night-card hover:bg-slate-800 border border-white/10 text-white text-lg font-semibold rounded-2xl transition active:scale-[0.98]"
-          >
-            Je Organizator?
-          </button>
+          
+           {installPrompt ? (
+            <button 
+             onClick={handleInstallClick}
+             className="w-full sm:w-auto px-8 py-4 bg-white text-night-bg hover:bg-gray-200 text-lg font-bold rounded-2xl transition active:scale-[0.98] animate-bounce"
+            >
+              📲 Instalo App-in
+            </button>
+           ) : (
+            <button 
+                onClick={() => setView('venue')}
+                className="w-full sm:w-auto px-8 py-4 bg-night-card hover:bg-slate-800 border border-white/10 text-white text-lg font-semibold rounded-2xl transition active:scale-[0.98]"
+            >
+                Je Organizator?
+            </button>
+           )}
         </div>
 
         <div className="mt-16 md:mt-20 grid grid-cols-2 md:grid-cols-4 gap-4 opacity-80">
@@ -820,7 +861,7 @@ function App() {
              
              <div className="bg-white/5 border border-white/10 rounded-xl p-6 w-full max-w-sm mb-8">
                  <p className="text-xs text-gray-400 uppercase font-bold mb-2">Kontakt Admin</p>
-                 <div className="text-xl text-white font-bold mb-1">+355 69 XX XX XXX</div>
+                 <div className="text-xl text-white font-bold mb-1">068 81 55 866</div>
                  <div className="text-sm text-green-400">WhatsApp / Telefon</div>
              </div>
 
