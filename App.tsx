@@ -68,6 +68,7 @@ function App() {
   // --- State Initialization ---
   const [allEvents, setAllEvents] = useState<AppEvent[]>([]);
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [isTableMissing, setIsTableMissing] = useState(false);
 
   // Load Saved Favorites
   const [savedEventIds, setSavedEventIds] = useState<Set<string>>(() => {
@@ -130,6 +131,10 @@ function App() {
   // Main Fetch Function
   const fetchEvents = async (silent = false) => {
     const events = await db.getEvents();
+    
+    // Check missing table state from DB service
+    setIsTableMissing(db.isTableMissing());
+
     if (events.length === 0 && !db.isConnected()) {
         setAllEvents(INITIAL_EVENTS);
     } else {
@@ -549,11 +554,6 @@ function App() {
             className="fixed bottom-0 right-0 w-10 h-10 z-50 cursor-default"
             aria-hidden="true"
         />
-
-        {/* Database Connection Indicator */}
-        <div className={`fixed bottom-2 right-2 px-2 py-1 rounded-full text-[10px] font-mono font-bold z-40 pointer-events-none opacity-50 ${db.isConnected() ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'}`}>
-            {db.isConnected() ? 'DB: LINKED' : 'DB: LOCAL (NO SYNC)'}
-        </div>
       </div>
     </div>
   );
@@ -955,6 +955,45 @@ function App() {
                         Dalje
                      </button>
                 </div>
+
+                {/* --- HELP BOX IF TABLE IS MISSING --- */}
+                {isTableMissing && (
+                    <div className="bg-red-500/10 border border-red-500/30 p-6 rounded-2xl mb-8 animate-pulse-slow">
+                        <div className="flex items-start gap-4">
+                            <span className="text-3xl">🛠️</span>
+                            <div className="flex-1">
+                                <h3 className="text-xl font-bold text-red-400 mb-2">Vëmendje: Databaza nuk është konfiguruar!</h3>
+                                <p className="text-gray-300 text-sm mb-4">
+                                    Tabela <code>events</code> nuk ekziston në Supabase. Aplikacioni po punon në mënyrë lokale (Offline Mode).
+                                    Për të sinkronizuar të dhënat, shkoni tek <strong>Supabase Dashboard &gt; SQL Editor</strong> dhe ekzekutoni kodin e mëposhtëm:
+                                </p>
+                                <div className="bg-black/50 p-4 rounded-lg border border-white/10 font-mono text-xs md:text-sm text-green-400 overflow-x-auto select-all">
+                                    <pre>{`CREATE TABLE events (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    venue TEXT NOT NULL,
+    city TEXT NOT NULL,
+    date TEXT NOT NULL,
+    type TEXT NOT NULL,
+    description TEXT,
+    price TEXT,
+    image TEXT,
+    phone TEXT,
+    status TEXT DEFAULT 'pending',
+    is_promoted BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+);
+
+ALTER TABLE events ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public Read" ON events FOR SELECT USING (true);
+CREATE POLICY "Public Insert" ON events FOR INSERT WITH CHECK (true);
+CREATE POLICY "Public Update" ON events FOR UPDATE USING (true);
+CREATE POLICY "Public Delete" ON events FOR DELETE USING (true);`}</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Quick Stats */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6 mb-10">
