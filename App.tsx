@@ -165,6 +165,28 @@ function App() {
     };
   }, []);
 
+  // Deep-link: nëse URL-ja ka ?event=ID, hape automatikisht atë event pas ngarkimit
+  useEffect(() => {
+    if (!dataLoaded) return;
+    const params = new URLSearchParams(window.location.search);
+    const eventId = params.get('event');
+    if (eventId) {
+      const found = allEvents.find(e => e.id === eventId);
+      if (found) setSelectedEvent(found);
+    }
+  }, [dataLoaded]);
+
+  // Përditëso URL-në kur hapet/mbyllet një event, që të jetë e share-ueshme
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (selectedEvent) {
+      url.searchParams.set('event', selectedEvent.id);
+    } else {
+      url.searchParams.delete('event');
+    }
+    window.history.replaceState({}, '', url.toString());
+  }, [selectedEvent]);
+
   // Persist Favorites & Subs
   useEffect(() => {
     localStorage.setItem('kudalim_favorites', JSON.stringify(Array.from(savedEventIds)));
@@ -293,6 +315,24 @@ function App() {
       const newFiles = Array.from(e.target.files).map((f: File) => f.name);
       setVenueForm(prev => ({ ...prev, files: [...prev.files, ...newFiles] }));
     }
+  };
+
+  const handleShareEvent = async (event: AppEvent) => {
+    const shareUrl = `${window.location.origin}${window.location.pathname}?event=${event.id}`;
+    const shareText = `${event.name} @ ${event.venue}, ${event.city} — ${event.date}`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: event.name, text: shareText, url: shareUrl });
+        return;
+      } catch (e) {
+        // Përdoruesi anuloi ose gabim — vazhdo te fallback
+      }
+    }
+
+    // Fallback: hap WhatsApp direkt me linkun
+    const waText = encodeURIComponent(`${shareText}\n${shareUrl}`);
+    window.open(`https://wa.me/?text=${waText}`, '_blank');
   };
 
   const handleAdminLogin = async () => {
@@ -425,6 +465,13 @@ function App() {
                     className={`absolute top-4 right-4 md:top-6 md:right-6 w-12 h-12 rounded-full flex items-center justify-center border transition z-20 backdrop-blur-md active:scale-90 shadow-xl ${isSaved ? 'bg-rose-500 border-rose-500 text-white' : 'bg-black/40 border-white/20 text-white hover:bg-black/60'}`}
                 >
                     <span className="text-2xl">{isSaved ? '❤️' : '🤍'}</span>
+                </button>
+                <button
+                    onClick={() => handleShareEvent(selectedEvent)}
+                    className="absolute top-4 right-20 md:top-6 md:right-24 w-12 h-12 rounded-full flex items-center justify-center border bg-black/40 border-white/20 text-white hover:bg-black/60 transition z-20 backdrop-blur-md active:scale-90 shadow-xl"
+                    title="Shpërndaj eventin"
+                >
+                    <span className="text-xl">📤</span>
                 </button>
 
                 <div className="absolute bottom-0 left-0 p-6 md:p-10 w-full">
