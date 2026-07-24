@@ -98,6 +98,11 @@ function App() {
   const [adminPass, setAdminPass] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loginError, setLoginError] = useState('');
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [oldPass, setOldPass] = useState('');
+  const [newPass, setNewPass] = useState('');
+  const [confirmPass, setConfirmPass] = useState('');
+  const [changePassMsg, setChangePassMsg] = useState('');
 
   // Search State
   const [searchParams, setSearchParams] = useState({
@@ -301,7 +306,8 @@ function App() {
   };
 
   const handleAdminLogin = () => {
-    if (adminPass === 'admin123') {
+    const storedPassword = localStorage.getItem('admin_password') || 'admin123';
+    if (adminPass === storedPassword) {
       setIsAuthenticated(true);
       setLoginError('');
       // Fetch immediate to be sure
@@ -336,6 +342,26 @@ function App() {
       setIsAuthenticated(false);
       setAdminPass('');
       setView('landing');
+  };
+
+  const handleChangePassword = () => {
+    const storedPassword = localStorage.getItem('admin_password') || 'admin123';
+    if (oldPass !== storedPassword) {
+      setChangePassMsg('error:Fjalëkalimi aktual është gabim.');
+      return;
+    }
+    if (newPass.length < 4) {
+      setChangePassMsg('error:Fjalëkalimi i ri duhet të ketë të paktën 4 shkronja.');
+      return;
+    }
+    if (newPass !== confirmPass) {
+      setChangePassMsg('error:Fjalëkalimet e reja s\'përputhen.');
+      return;
+    }
+    localStorage.setItem('admin_password', newPass);
+    setChangePassMsg('success:U ndryshua me sukses!');
+    setOldPass(''); setNewPass(''); setConfirmPass('');
+    setTimeout(() => { setShowChangePassword(false); setChangePassMsg(''); }, 1500);
   };
 
   // --- Render Functions ---
@@ -948,13 +974,43 @@ function App() {
                             )}
                          </p>
                      </div>
+                     <div className="flex items-center gap-2">
+                     <button 
+                        onClick={() => setShowChangePassword(true)} 
+                        className="bg-gray-800 hover:bg-gray-700 text-white px-6 py-2 rounded-xl font-medium border border-white/10 transition active:scale-95 text-sm"
+                     >
+                        🔒 Fjalëkalimi
+                     </button>
                      <button 
                         onClick={handleAdminLogout} 
                         className="bg-gray-800 hover:bg-gray-700 text-white px-6 py-2 rounded-xl font-medium border border-white/10 transition active:scale-95 text-sm"
                      >
                         Dalje
                      </button>
+                     </div>
                 </div>
+
+                {showChangePassword && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+                        <div className="bg-gray-900 rounded-2xl max-w-sm w-full p-6 border border-white/10">
+                            <h3 className="text-lg font-bold text-white mb-4">Ndrysho Fjalëkalimin</h3>
+                            <div className="space-y-3">
+                                <input type="password" placeholder="Fjalëkalimi aktual" value={oldPass} onChange={(e) => setOldPass(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-pink-500" />
+                                <input type="password" placeholder="Fjalëkalimi i ri" value={newPass} onChange={(e) => setNewPass(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-pink-500" />
+                                <input type="password" placeholder="Konfirmo fjalëkalimin e ri" value={confirmPass} onChange={(e) => setConfirmPass(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-pink-500" />
+                                {changePassMsg && (
+                                    <p className={`text-xs font-semibold ${changePassMsg.startsWith('error') ? 'text-red-400' : 'text-green-400'}`}>
+                                        {changePassMsg.split(':')[1]}
+                                    </p>
+                                )}
+                                <div className="flex gap-2 pt-2">
+                                    <button onClick={() => { setShowChangePassword(false); setChangePassMsg(''); setOldPass(''); setNewPass(''); setConfirmPass(''); }} className="flex-1 py-2.5 rounded-full bg-gray-800 hover:bg-gray-700 text-white font-bold text-xs uppercase">Anulo</button>
+                                    <button onClick={handleChangePassword} className="flex-1 py-2.5 rounded-full bg-pink-600 hover:bg-pink-500 text-white font-bold text-xs uppercase">Ruaj</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* --- HELP BOX IF TABLE IS MISSING --- */}
                 {isTableMissing && (
