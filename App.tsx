@@ -305,8 +305,8 @@ function App() {
     }
   };
 
-  const handleAdminLogin = () => {
-    const storedPassword = localStorage.getItem('admin_password') || 'admin123';
+  const handleAdminLogin = async () => {
+    const storedPassword = await db.getSetting('admin_password', 'admin123');
     if (adminPass === storedPassword) {
       setIsAuthenticated(true);
       setLoginError('');
@@ -344,8 +344,8 @@ function App() {
       setView('landing');
   };
 
-  const handleChangePassword = () => {
-    const storedPassword = localStorage.getItem('admin_password') || 'admin123';
+  const handleChangePassword = async () => {
+    const storedPassword = await db.getSetting('admin_password', 'admin123');
     if (oldPass !== storedPassword) {
       setChangePassMsg('error:Fjalëkalimi aktual është gabim.');
       return;
@@ -358,7 +358,7 @@ function App() {
       setChangePassMsg('error:Fjalëkalimet e reja s\'përputhen.');
       return;
     }
-    localStorage.setItem('admin_password', newPass);
+    await db.setSetting('admin_password', newPass);
     setChangePassMsg('success:U ndryshua me sukses!');
     setOldPass(''); setNewPass(''); setConfirmPass('');
     setTimeout(() => { setShowChangePassword(false); setChangePassMsg(''); }, 1500);

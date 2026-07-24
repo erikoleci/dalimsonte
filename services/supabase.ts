@@ -191,9 +191,43 @@ export const db = {
                console.error("Network error deleting event:", getErrorText(e));
             }
         }
-        
+
         const events = await db.getEvents();
         const newEvents = events.filter(e => e.id !== id);
         localStorage.setItem('kudalim_events', JSON.stringify(newEvents));
+    },
+
+    // --- App Settings (p.sh. fjalëkalimi i adminit) — ruhen në DB, jo lokalisht,
+    // kështu që janë të njëjta për këdo që hyn, nga çdo pajisje.
+    getSetting: async (key: string, fallback: string): Promise<string> => {
+        if (isConnected && supabase) {
+            try {
+                const { data, error } = await supabase
+                    .from('app_settings')
+                    .select('value')
+                    .eq('key', key)
+                    .maybeSingle();
+                if (!error && data?.value) return data.value;
+            } catch (e) {
+                console.error("Error fetching setting:", getErrorText(e));
+            }
+        }
+        return localStorage.getItem(`kudalim_setting_${key}`) || fallback;
+    },
+
+    setSetting: async (key: string, value: string): Promise<boolean> => {
+        localStorage.setItem(`kudalim_setting_${key}`, value); // fallback lokal gjithmonë
+        if (isConnected && supabase) {
+            try {
+                const { error } = await supabase
+                    .from('app_settings')
+                    .upsert({ key, value }, { onConflict: 'key' });
+                return !error;
+            } catch (e) {
+                console.error("Error saving setting:", getErrorText(e));
+                return false;
+            }
+        }
+        return true;
     }
 };

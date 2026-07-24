@@ -1,0 +1,36 @@
+name: Supabase Keep Alive System
+
+on:
+  schedule:
+    - cron: "0 0 */5 * *"
+  workflow_dispatch:
+
+jobs:
+  ping-supabase:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase Database & Confirm Active
+        env:
+          SUPABASE_URL: "https://ytfemeqepmffxckjeehg.supabase.co"
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          if [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "Warning: SUPABASE_KEY secret mungon te GitHub repo settings."
+            exit 0
+          fi
+
+          echo "Duke dërguar ping te Supabase..."
+
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X GET "${SUPABASE_URL}/rest/v1/events?select=id&limit=1" \
+            -H "apikey: ${SUPABASE_ANON_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}")
+
+          echo "Supabase HTTP Response Code: ${RESPONSE}"
+
+          if [ "$RESPONSE" -eq 200 ] || [ "$RESPONSE" -eq 206 ]; then
+            echo "Success: Supabase database është AKTIVE."
+          else
+            echo "Error: ping dështoi me status ${RESPONSE}."
+            exit 1
+          fi
