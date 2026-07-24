@@ -182,6 +182,28 @@ export const db = {
         localStorage.setItem('kudalim_events', JSON.stringify(newEvents));
     },
 
+    // Edit i plotë (kur admini gabon dhe do të korrigjojë emrin, datën, çmimin, etj.)
+    updateEvent: async (id: string, updates: Partial<AppEvent>) => {
+        if (isConnected && supabase && !tableMissing) {
+            try {
+                const payload: any = { ...updates };
+                if ('isPromoted' in payload) {
+                    payload.is_promoted = payload.isPromoted;
+                    delete payload.isPromoted;
+                }
+                delete payload.id;
+                const { error } = await supabase.from('events').update(payload).eq('id', id);
+                if (error && isTableMissingError(error)) tableMissing = true;
+            } catch (e) {
+                console.error("Network error editing event:", getErrorText(e));
+            }
+        }
+
+        const events = await db.getEvents();
+        const newEvents = events.map(e => e.id === id ? { ...e, ...updates } : e);
+        localStorage.setItem('kudalim_events', JSON.stringify(newEvents));
+    },
+
     deleteEvent: async (id: string) => {
         if (isConnected && supabase && !tableMissing) {
             try {

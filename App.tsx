@@ -102,6 +102,7 @@ function App() {
   const [newPass, setNewPass] = useState('');
   const [confirmPass, setConfirmPass] = useState('');
   const [changePassMsg, setChangePassMsg] = useState('');
+  const [editingEvent, setEditingEvent] = useState<AppEvent | null>(null);
 
   // Search State
   const [searchParams, setSearchParams] = useState({
@@ -354,6 +355,14 @@ function App() {
       await db.deleteEvent(id);
       addNotification('Eventi u fshi.', 'info');
     }
+  };
+
+  const handleUpdateEvent = async () => {
+    if (!editingEvent) return;
+    setAllEvents(prev => prev.map(e => e.id === editingEvent.id ? editingEvent : e));
+    await db.updateEvent(editingEvent.id, editingEvent);
+    addNotification('Eventi u përditësua.', 'success');
+    setEditingEvent(null);
   };
 
   const handleApproveEvent = async (id: string, promote = false) => {
@@ -1046,6 +1055,40 @@ function App() {
                     </div>
                 )}
 
+                {editingEvent && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
+                        <div className="bg-gray-900 rounded-2xl max-w-lg w-full p-6 border border-white/10 my-8">
+                            <h3 className="text-lg font-bold text-white mb-4">✏️ Ndrysho Eventin</h3>
+                            <div className="space-y-3">
+                                <input type="text" placeholder="Emri i eventit" value={editingEvent.name} onChange={(e) => setEditingEvent({ ...editingEvent, name: e.target.value })} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-night-accent" />
+                                <div className="grid grid-cols-2 gap-3">
+                                    <input type="text" placeholder="Lokali" value={editingEvent.venue} onChange={(e) => setEditingEvent({ ...editingEvent, venue: e.target.value })} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-night-accent" />
+                                    <select value={editingEvent.city} onChange={(e) => setEditingEvent({ ...editingEvent, city: e.target.value })} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-night-accent">
+                                        {CITIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                    </select>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <input type="date" value={editingEvent.date} onChange={(e) => setEditingEvent({ ...editingEvent, date: e.target.value })} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-night-accent" />
+                                    <select value={editingEvent.type} onChange={(e) => setEditingEvent({ ...editingEvent, type: e.target.value })} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-night-accent">
+                                        {CATEGORIES.filter(c => c !== 'All Vibe').map(c => <option key={c} value={c}>{c}</option>)}
+                                    </select>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <input type="text" placeholder="Çmimi" value={editingEvent.price} onChange={(e) => setEditingEvent({ ...editingEvent, price: e.target.value })} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-night-accent" />
+                                    <input type="text" placeholder="Telefoni" value={editingEvent.phone} onChange={(e) => setEditingEvent({ ...editingEvent, phone: e.target.value })} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-night-accent" />
+                                </div>
+                                <input type="text" placeholder="URL e fotos" value={editingEvent.image} onChange={(e) => setEditingEvent({ ...editingEvent, image: e.target.value })} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-night-accent" />
+                                <textarea rows={3} placeholder="Përshkrimi" value={editingEvent.description} onChange={(e) => setEditingEvent({ ...editingEvent, description: e.target.value })} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-night-accent" />
+
+                                <div className="flex gap-2 pt-2">
+                                    <button onClick={() => setEditingEvent(null)} className="flex-1 py-2.5 rounded-full bg-gray-800 hover:bg-gray-700 text-white font-bold text-xs uppercase">Anulo</button>
+                                    <button onClick={handleUpdateEvent} className="flex-1 py-2.5 rounded-full bg-night-accent hover:bg-rose-700 text-white font-bold text-xs uppercase">Ruaj Ndryshimet</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* --- HELP BOX IF TABLE IS MISSING --- */}
                 {isTableMissing && (
                     <div className="bg-red-500/10 border border-red-500/30 p-6 rounded-2xl mb-8 animate-pulse-slow">
@@ -1184,6 +1227,13 @@ CREATE POLICY "Public Delete" ON events FOR DELETE USING (true);`}</pre>
                                                         </>
                                                     )}
                                                     <button 
+                                                        onClick={() => setEditingEvent(event)}
+                                                        className="bg-blue-500/10 hover:bg-blue-500 text-blue-400 hover:text-white px-3 py-2 rounded-lg text-xs font-bold transition duration-300 border border-blue-500/30"
+                                                        title="Ndrysho"
+                                                    >
+                                                        ✏️
+                                                    </button>
+                                                    <button 
                                                         onClick={() => handleDeleteEvent(event.id)}
                                                         className="bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white px-3 py-2 rounded-lg text-xs font-bold transition duration-300 border border-red-500/30"
                                                         title="Refuzo / Tërhiq"
@@ -1254,6 +1304,12 @@ CREATE POLICY "Public Delete" ON events FOR DELETE USING (true);`}</pre>
                                                 </button>
                                             </>
                                         )}
+                                        <button 
+                                            onClick={() => setEditingEvent(event)}
+                                            className="px-4 bg-blue-500/20 text-blue-400 py-2 rounded-lg text-xs font-bold"
+                                        >
+                                            ✏️
+                                        </button>
                                         <button 
                                             onClick={() => handleDeleteEvent(event.id)}
                                             className="px-4 bg-red-500/20 text-red-500 py-2 rounded-lg text-xs font-bold"
