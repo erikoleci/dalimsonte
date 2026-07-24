@@ -11,7 +11,6 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     define: {
       // This ensures process.env variables are replaced by actual values during build
-      'process.env.API_KEY': JSON.stringify(env.API_KEY),
       'process.env.SUPABASE_KEY': JSON.stringify(env.SUPABASE_KEY),
     },
   };

@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { generatePromoDescription } from './services/geminiService';
 import { db } from './services/supabase';
 import { AppEvent, AppNotification } from './types';
 import ReactMarkdown from 'react-markdown';
@@ -128,7 +127,6 @@ function App() {
     files: [] as string[],
     wantPromotion: false
   });
-  const [promoLoading, setPromoLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // --- Effects ---
@@ -246,14 +244,6 @@ function App() {
       setSearchResults(results);
       setLoading(false);
     }, 500);
-  };
-
-  const handleGeneratePromo = async () => {
-    if (!venueForm.venueName) return;
-    setPromoLoading(true);
-    const desc = await generatePromoDescription(venueForm.venueName, `${venueForm.type} - ${venueForm.eventName}`);
-    setVenueForm(prev => ({ ...prev, description: desc }));
-    setPromoLoading(false);
   };
 
   const handleSubmitEvent = async () => {
@@ -876,10 +866,7 @@ function App() {
                 </div>
 
                 <div>
-                   <div className="flex justify-between items-center mb-2">
-                     <label className="block text-sm font-medium text-gray-300">Përshkrimi</label>
-                     <button onClick={handleGeneratePromo} disabled={promoLoading || !venueForm.venueName} className="text-xs text-purple-400 hover:text-purple-300 flex items-center gap-1 disabled:opacity-50">✨ AI Help</button>
-                   </div>
+                   <label className="block text-sm font-medium text-gray-300 mb-2">Përshkrimi</label>
                    <textarea rows={4} value={venueForm.description} onChange={(e) => setVenueForm({...venueForm, description: e.target.value})} className="w-full bg-night-bg border border-gray-700 rounded-xl p-3 text-white focus:ring-2 focus:ring-night-accent outline-none text-base" placeholder="Përshkruaj atmosferën..." />
                 </div>
              </div>
