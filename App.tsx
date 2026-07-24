@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { db } from './services/supabase';
+import { db, uploadEventImages } from './services/supabase';
 import { AppEvent, AppNotification } from './types';
 import ReactMarkdown from 'react-markdown';
 
@@ -59,6 +59,13 @@ const NotificationToast = ({ notifications }: { notifications: AppNotification[]
       ))}
     </div>
   );
+};
+
+// Ndërton link WhatsApp nga numri i telefonit, duke pastruar hapësira/simbole
+const getWhatsAppReserveUrl = (event: AppEvent) => {
+  const digitsOnly = (event.phone || '').replace(/[^0-9]/g, '');
+  const text = encodeURIComponent(`Përshëndetje! Dëshiroj të rezervoj për "${event.name}" (${event.date}) te ${event.venue}.`);
+  return `https://wa.me/${digitsOnly}?text=${text}`;
 };
 
 function App() {
@@ -125,10 +132,11 @@ function App() {
     description: '',
     price: 'Falas',
     phone: '',
-    files: [] as string[],
+    files: [] as File[],
     wantPromotion: false
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [submitting, setSubmitting] = useState(false);
   
   // --- Effects ---
 
@@ -179,6 +187,7 @@ function App() {
 
   // Përditëso URL-në kur hapet/mbyllet një event, që të jetë e share-ueshme
   useEffect(() => {
+    setGalleryIndex(0);
     const url = new URL(window.location.href);
     if (selectedEvent) {
       url.searchParams.set('event', selectedEvent.id);
@@ -270,6 +279,20 @@ function App() {
   };
 
   const handleSubmitEvent = async () => {
+    let imageUrl = 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80';
+    let gallery: string[] = [];
+
+    if (venueForm.files.length > 0) {
+      setSubmitting(true);
+      try {
+        gallery = await uploadEventImages(venueForm.files);
+        if (gallery.length > 0) imageUrl = gallery[0];
+      } catch (e) {
+        console.error('Gabim gjatë ngarkimit të fotove:', e);
+      }
+      setSubmitting(false);
+    }
+
     const newEvent: AppEvent = {
       id: Math.random().toString(36).substr(2, 9),
       name: venueForm.eventName || 'Event Special',
@@ -280,7 +303,8 @@ function App() {
       description: venueForm.description,
       price: venueForm.price,
       phone: venueForm.phone || '+355 69 XX XX XXX',
-      image: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80',
+      image: imageUrl,
+      gallery,
       status: 'pending',
       isPromoted: venueForm.wantPromotion
     };
@@ -313,9 +337,14 @@ function App() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      const newFiles = Array.from(e.target.files).map((f: File) => f.name);
-      setVenueForm(prev => ({ ...prev, files: [...prev.files, ...newFiles] }));
+      const newFiles = Array.from(e.target.files);
+      setVenueForm(prev => ({ ...prev, files: [...prev.files, ...newFiles].slice(0, 3) }));
     }
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleRemoveFile = (index: number) => {
+    setVenueForm(prev => ({ ...prev, files: prev.files.filter((_, i) => i !== index) }));
   };
 
   const handleShareEvent = async (event: AppEvent) => {
@@ -453,18 +482,40 @@ function App() {
     </nav>
   );
 
+  const [galleryIndex, setGalleryIndex] = useState(0);
+
   const renderEventDetails = () => {
     if (!selectedEvent) return null;
     const isSaved = savedEventIds.has(selectedEvent.id);
+    const photos = selectedEvent.gallery && selectedEvent.gallery.length > 0 ? selectedEvent.gallery : [selectedEvent.image];
 
     return (
         <div className="fixed inset-0 z-[60] bg-night-bg overflow-y-auto animate-fade-in">
-             {/* Hero Image */}
+             {/* Hero Image / Gallery */}
              <div className="relative h-[40vh] md:h-[50vh] w-full">
-                <img src={selectedEvent.image} alt={selectedEvent.name} className="w-full h-full object-cover" />
+                <img src={photos[galleryIndex] || photos[0]} alt={selectedEvent.name} className="w-full h-full object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-night-bg via-night-bg/50 to-transparent"></div>
+
+                {photos.length > 1 && (
+                  <>
+                    <button
+                      onClick={() => setGalleryIndex(i => (i - 1 + photos.length) % photos.length)}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 bg-black/50 backdrop-blur rounded-full flex items-center justify-center text-white z-20"
+                    >‹</button>
+                    <button
+                      onClick={() => setGalleryIndex(i => (i + 1) % photos.length)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 bg-black/50 backdrop-blur rounded-full flex items-center justify-center text-white z-20"
+                    >›</button>
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 z-20">
+                      {photos.map((_, i) => (
+                        <span key={i} className={`w-2 h-2 rounded-full ${i === galleryIndex ? 'bg-white' : 'bg-white/40'}`} />
+                      ))}
+                    </div>
+                  </>
+                )}
+
                 <button 
-                    onClick={() => setSelectedEvent(null)}
+                    onClick={() => { setSelectedEvent(null); setGalleryIndex(0); }}
                     className="absolute top-4 left-4 md:top-6 md:left-6 w-10 h-10 bg-black/50 backdrop-blur rounded-full flex items-center justify-center text-white border border-white/10 active:scale-90 transition z-20"
                 >
                     ←
@@ -546,10 +597,12 @@ function App() {
                         <div className="text-2xl font-bold text-night-accent">{selectedEvent.price}</div>
                     </div>
                     <a 
-                        href={`tel:${selectedEvent.phone}`}
+                        href={getWhatsAppReserveUrl(selectedEvent)}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="flex-1 bg-white text-night-bg font-bold py-3.5 rounded-xl hover:bg-gray-200 transition active:scale-[0.98] shadow-lg flex items-center justify-center gap-2"
                     >
-                        Rezervo Tani 📞
+                        Rezervo Tani 💬
                     </a>
                 </div>
              </div>
@@ -886,12 +939,21 @@ function App() {
                     />
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Poster / Foto</label>
-                      <input type="file" ref={fileInputRef} multiple onChange={handleFileChange} className="hidden" />
-                      <button onClick={() => fileInputRef.current?.click()} className="w-full bg-night-bg border border-dashed border-gray-600 hover:border-night-accent rounded-xl p-3 text-gray-400 hover:text-white transition text-sm flex items-center justify-center gap-2 active:bg-white/5">📷 Ngarko Foto</button>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Poster / Foto (deri në 3)</label>
+                      <input type="file" ref={fileInputRef} multiple accept="image/*" onChange={handleFileChange} className="hidden" disabled={venueForm.files.length >= 3} />
+                      <button onClick={() => fileInputRef.current?.click()} disabled={venueForm.files.length >= 3} className="w-full bg-night-bg border border-dashed border-gray-600 hover:border-night-accent rounded-xl p-3 text-gray-400 hover:text-white transition text-sm flex items-center justify-center gap-2 active:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed">
+                        📷 {venueForm.files.length >= 3 ? 'Maksimumi 3 foto' : `Ngarko Foto (${venueForm.files.length}/3)`}
+                      </button>
                       {venueForm.files.length > 0 && (
-                        <div className="flex gap-2 flex-wrap mt-2">{venueForm.files.map((f, i) => (<span key={i} className="text-xs bg-slate-700 px-2 py-1 rounded text-gray-300">{f}</span>))}</div>
-                        )}
+                        <div className="flex gap-2 flex-wrap mt-3">
+                          {venueForm.files.map((f, i) => (
+                            <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden border border-white/10 group">
+                              <img src={URL.createObjectURL(f)} className="w-full h-full object-cover" alt="" />
+                              <button onClick={() => handleRemoveFile(i)} className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-lg transition">✕</button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                 </div>
                 
                 {/* Enhanced Monetization Feature UI */}
@@ -926,7 +988,7 @@ function App() {
                    <textarea rows={4} value={venueForm.description} onChange={(e) => setVenueForm({...venueForm, description: e.target.value})} className="w-full bg-night-bg border border-gray-700 rounded-xl p-3 text-white focus:ring-2 focus:ring-night-accent outline-none text-base" placeholder="Përshkruaj atmosferën..." />
                 </div>
              </div>
-             <button onClick={handleSubmitEvent} disabled={!venueForm.venueName || !venueForm.description || !venueForm.phone} className="w-full bg-night-accent hover:bg-rose-700 text-white font-bold py-4 rounded-xl transition disabled:opacity-50 active:scale-[0.98]">Dërgo për Miratim 🚀</button>
+             <button onClick={handleSubmitEvent} disabled={submitting || !venueForm.venueName || !venueForm.description || !venueForm.phone} className="w-full bg-night-accent hover:bg-rose-700 text-white font-bold py-4 rounded-xl transition disabled:opacity-50 active:scale-[0.98]">{submitting ? 'Duke ngarkuar fotot...' : 'Dërgo për Miratim 🚀'}</button>
           </div>
         ) : (
           <div className="p-10 md:p-12 text-center flex flex-col items-center">

@@ -31,6 +31,7 @@ export interface AppEvent {
   description: string;
   price: string;
   image: string;
+  gallery?: string[]; // deri në 3 foto
   phone: string; // Contact number for reservations
   status: 'pending' | 'approved'; // New field for approval workflow
   isPromoted?: boolean; // New field for monetization (Premium events)

@@ -44,6 +44,48 @@ if (SUPABASE_URL && SUPABASE_KEY) {
     console.warn("⚠️ Mungon SUPABASE_KEY! Aplikacioni po punon lokalisht.");
 }
 
+const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+};
+
+// Ngarkon 1 foto në bucket 'event-images'; nëse dështon (bucket mungon, etj.), bie te Base64
+export const uploadEventImage = async (file: File): Promise<string> => {
+    if (isConnected && supabase) {
+        try {
+            const fileExt = file.name.split('.').pop() || 'jpg';
+            const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
+            const { error } = await supabase.storage
+                .from('event-images')
+                .upload(fileName, file, { cacheControl: '3600', upsert: true });
+
+            if (!error) {
+                const { data } = supabase.storage.from('event-images').getPublicUrl(fileName);
+                if (data?.publicUrl) return data.publicUrl;
+            } else {
+                console.warn('Storage upload failed, using Base64 fallback:', error.message);
+            }
+        } catch (e) {
+            console.warn('Storage upload exception, using Base64 fallback:', e);
+        }
+    }
+    return await fileToBase64(file);
+};
+
+// Ngarkon deri në 3 foto dhe kthen URL-të, në rendin e dhënë
+export const uploadEventImages = async (files: File[]): Promise<string[]> => {
+    const limited = files.slice(0, 3);
+    const urls: string[] = [];
+    for (const file of limited) {
+        urls.push(await uploadEventImage(file));
+    }
+    return urls;
+};
+
 export const db = {
     isConnected: () => isConnected,
     isTableMissing: () => tableMissing,
@@ -97,7 +139,8 @@ export const db = {
                     tableMissing = false;
                     return data.map((e: any) => ({
                         ...e,
-                        isPromoted: e.is_promoted 
+                        isPromoted: e.is_promoted,
+                        gallery: Array.isArray(e.gallery_urls) ? e.gallery_urls : []
                     }));
                 }
             } catch (e) {
@@ -125,6 +168,7 @@ export const db = {
                     description: event.description,
                     price: event.price,
                     image: event.image,
+                    gallery_urls: event.gallery || [],
                     phone: event.phone,
                     status: event.status,
                     is_promoted: event.isPromoted || false
@@ -190,6 +234,10 @@ export const db = {
                 if ('isPromoted' in payload) {
                     payload.is_promoted = payload.isPromoted;
                     delete payload.isPromoted;
+                }
+                if ('gallery' in payload) {
+                    payload.gallery_urls = payload.gallery;
+                    delete payload.gallery;
                 }
                 delete payload.id;
                 const { error } = await supabase.from('events').update(payload).eq('id', id);
