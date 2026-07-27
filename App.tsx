@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { db, uploadEventImages } from './services/supabase';
 import { AppEvent, AppNotification } from './types';
-import ReactMarkdown from 'react-markdown';
 
 const CITIES = ['Tiranë', 'Durrës', 'Vlorë', 'Shkodër', 'Sarandë', 'Korçë'];
 const CATEGORIES = ['All Vibe', 'Live Music', 'Techno/House', 'Hip Hop / R&B', 'Latino', 'Chill / Lounge', 'Rock'];
