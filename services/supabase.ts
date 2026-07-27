@@ -1,26 +1,26 @@
 import { createClient } from '@supabase/supabase-js';
 import { AppEvent } from '../types';
 
-// --- KONFIGURIMI I DATABAZËS ---
+// --- DATABASE CONFIGURATION ---
 
 const SUPABASE_URL = 'https://ytfemeqepmffxckjeehg.supabase.co';
 
-// Çelësi i dhënë nga përdoruesi
+// Key provided by the user
 const USER_PROVIDED_KEY = 'sb_publishable_JhQVaiJFTKfWGUdVd_u7rw_Q91S5QcO';
 
 const ENV_KEY = process.env.SUPABASE_KEY;
 const LOCAL_KEY = localStorage.getItem('kudalim_supabase_key');
 
-// Përdorim çelësin e disponueshëm (Env > Local > Hardcoded)
+// Use the available key (Env > Local > Hardcoded)
 const SUPABASE_KEY = ENV_KEY || LOCAL_KEY || USER_PROVIDED_KEY;
 
 let supabase: any = null;
 let isConnected = false;
 let tableMissing = false; // Track if table is missing
 
-// Funksion ndihmës për të shmangur [object Object]
+// Helper function to avoid [object Object]
 const getErrorText = (error: any): string => {
-    if (!error) return 'Gabim i panjohur';
+    if (!error) return 'Unknown error';
     if (typeof error === 'string') return error;
     if (error.message) return error.message;
     return JSON.stringify(error, null, 2);
@@ -41,7 +41,7 @@ if (SUPABASE_URL && SUPABASE_KEY) {
         isConnected = false;
     }
 } else {
-    console.warn("⚠️ Mungon SUPABASE_KEY! Aplikacioni po punon lokalisht.");
+    console.warn("⚠️ SUPABASE_KEY is missing! The app is running locally.");
 }
 
 const fileToBase64 = (file: File): Promise<string> => {
@@ -53,7 +53,7 @@ const fileToBase64 = (file: File): Promise<string> => {
     });
 };
 
-// Ngarkon 1 foto në bucket 'event-images'; nëse dështon (bucket mungon, etj.), bie te Base64
+// Uploads 1 photo to the 'event-images' bucket; if it fails (bucket missing, etc.), falls back to Base64
 export const uploadEventImage = async (file: File): Promise<string> => {
     if (isConnected && supabase) {
         try {
@@ -76,7 +76,7 @@ export const uploadEventImage = async (file: File): Promise<string> => {
     return await fileToBase64(file);
 };
 
-// Ngarkon deri në 3 foto dhe kthen URL-të, në rendin e dhënë
+// Uploads up to 3 photos and returns the URLs, in the given order
 export const uploadEventImages = async (files: File[]): Promise<string[]> => {
     const limited = files.slice(0, 3);
     const urls: string[] = [];
@@ -107,7 +107,7 @@ export const db = {
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'events' },
                 (payload: any) => {
-                    console.log('Ndryshim në DB u detektua!', payload);
+                    console.log('DB change detected!', payload);
                     callback(); 
                 }
             )
@@ -120,7 +120,7 @@ export const db = {
     },
 
     getEvents: async (): Promise<AppEvent[]> => {
-        // Përpiqu të marrësh nga DB
+        // Try to fetch from DB
         if (isConnected && supabase) {
             try {
                 const { data, error } = await supabase
@@ -132,9 +132,9 @@ export const db = {
                     console.error("Supabase Error:", getErrorText(error));
                     if (isTableMissingError(error)) {
                         tableMissing = true;
-                        console.warn("Tabela 'events' mungon. Duke kaluar në Local Storage.");
+                        console.warn("The 'events' table is missing. Falling back to Local Storage.");
                     }
-                    // Mos kthe error, vazhdo te Local Storage fallback
+                    // Don't return the error, continue to Local Storage fallback
                 } else if (data) {
                     tableMissing = false;
                     return data.map((e: any) => ({
@@ -148,7 +148,7 @@ export const db = {
             }
         }
         
-        // Fallback: Local Storage (përdoret nëse DB dështon ose tabela mungon)
+        // Fallback: Local Storage (used if the DB fails or the table is missing)
         const local = localStorage.getItem('kudalim_events');
         return local ? JSON.parse(local) : [];
     },
@@ -177,11 +177,11 @@ export const db = {
                 if (error) {
                     if (isTableMissingError(error)) {
                         tableMissing = true;
-                        console.warn("Tabela mungon, po ruajmë lokalisht.");
+                        console.warn("Table is missing, saving locally.");
                     } else {
                         const errorMsg = getErrorText(error);
                         console.error("DB Insert Error:", errorMsg);
-                        alert("Gabim gjatë ruajtjes në database: " + errorMsg);
+                        alert("Error while saving to database: " + errorMsg);
                         return false; 
                     }
                 } else {
@@ -190,14 +190,14 @@ export const db = {
                 }
             } catch (e: any) {
                 console.error("Network error adding event:", getErrorText(e));
-                // Vazhdojmë me local storage
+                // Continue with local storage
             }
         }
 
-        // Nëse nuk u ruajt në DB (ose tabela mungon), ruaj në Local Storage
+        // If it wasn't saved to the DB (or the table is missing), save to Local Storage
         if (!savedToDb) {
-            const events = await db.getEvents(); // Kjo merr local events nëse db fail
-            // Evito duplikimet nëse getEvents ktheu nga DB por insert dështoi (edge case)
+            const events = await db.getEvents(); // This gets local events if the db call fails
+            // Avoid duplicates if getEvents returned from DB but insert failed (edge case)
             const exists = events.some(e => e.id === event.id);
             if (!exists) {
                 const newEvents = [event, ...events];
@@ -226,7 +226,7 @@ export const db = {
         localStorage.setItem('kudalim_events', JSON.stringify(newEvents));
     },
 
-    // Edit i plotë (kur admini gabon dhe do të korrigjojë emrin, datën, çmimin, etj.)
+    // Full edit (when the admin makes a mistake and wants to fix the name, date, price, etc.)
     updateEvent: async (id: string, updates: Partial<AppEvent>) => {
         if (isConnected && supabase && !tableMissing) {
             try {
@@ -267,8 +267,8 @@ export const db = {
         localStorage.setItem('kudalim_events', JSON.stringify(newEvents));
     },
 
-    // --- App Settings (p.sh. fjalëkalimi i adminit) — ruhen në DB, jo lokalisht,
-    // kështu që janë të njëjta për këdo që hyn, nga çdo pajisje.
+    // --- App Settings (e.g. the admin password) — stored in the DB, not locally,
+    // so they're the same for anyone who logs in, from any device.
     getSetting: async (key: string, fallback: string): Promise<string> => {
         if (isConnected && supabase) {
             try {
@@ -286,7 +286,7 @@ export const db = {
     },
 
     setSetting: async (key: string, value: string): Promise<boolean> => {
-        localStorage.setItem(`kudalim_setting_${key}`, value); // fallback lokal gjithmonë
+        localStorage.setItem(`kudalim_setting_${key}`, value); // always keep a local fallback
         if (isConnected && supabase) {
             try {
                 const { error } = await supabase

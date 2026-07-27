@@ -19,7 +19,7 @@ const INITIAL_EVENTS: AppEvent[] = [
     city: 'Tiranë',
     date: getTodayString(),
     type: 'Techno/House',
-    description: 'Nata më e zjarrtë e vitit me DJ Tiesto (Tribute). Kokteile falas për vajzat deri në orën 23:00.',
+    description: 'The hottest night of the year with DJ Tiesto (Tribute). Free cocktails for ladies until 11:00 PM.',
     price: '10€',
     image: 'https://images.unsplash.com/photo-1570125909232-eb263c188f7e?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80',
     phone: '+355691234567',
@@ -33,8 +33,8 @@ const INITIAL_EVENTS: AppEvent[] = [
     city: 'Tiranë',
     date: getTodayString(),
     type: 'Chill / Lounge',
-    description: 'Muzikë Jazz live nga banda lokale. Një natë e qetë për adhuruesit e verës.',
-    price: 'Falas',
+    description: 'Live jazz music from a local band. A relaxed night for wine lovers.',
+    price: 'Free',
     image: 'https://images.unsplash.com/photo-1514525253440-b393452e8d26?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80',
     phone: '+355692223333',
     status: 'approved'
@@ -52,7 +52,7 @@ const NotificationToast = ({ notifications }: { notifications: AppNotification[]
         <div key={n.id} className="bg-night-card/95 backdrop-blur-xl border border-white/10 text-white px-5 py-4 rounded-2xl shadow-2xl shadow-black/50 flex items-center gap-4 animate-bounce-in pointer-events-auto">
            <span className="text-2xl">{n.type === 'success' ? '✅' : n.type === 'warning' ? '⚠️' : '🔔'}</span>
            <div className="flex-1">
-             <p className="font-bold text-sm text-white">{n.type === 'success' ? 'Sukses' : n.type === 'warning' ? 'Kujdes' : 'Njoftim'}</p>
+             <p className="font-bold text-sm text-white">{n.type === 'success' ? 'Success' : n.type === 'warning' ? 'Warning' : 'Notification'}</p>
              <p className="text-sm text-gray-300 leading-tight">{n.message}</p>
            </div>
         </div>
@@ -61,10 +61,10 @@ const NotificationToast = ({ notifications }: { notifications: AppNotification[]
   );
 };
 
-// Ndërton link WhatsApp nga numri i telefonit, duke pastruar hapësira/simbole
+// Builds a WhatsApp link from the phone number, stripping spaces/symbols
 const getWhatsAppReserveUrl = (event: AppEvent) => {
   const digitsOnly = (event.phone || '').replace(/[^0-9]/g, '');
-  const text = encodeURIComponent(`Përshëndetje! Dëshiroj të rezervoj për "${event.name}" (${event.date}) te ${event.venue}.`);
+  const text = encodeURIComponent(`Hello! I would like to reserve for "${event.name}" (${event.date}) at ${event.venue}.`);
   return `https://wa.me/${digitsOnly}?text=${text}`;
 };
 
@@ -130,7 +130,7 @@ function App() {
     date: getTodayString(),
     type: 'Techno/House', 
     description: '',
-    price: 'Falas',
+    price: 'Free',
     phone: '',
     files: [] as File[],
     wantPromotion: false
@@ -163,7 +163,7 @@ function App() {
 
     // Subscribe to real-time changes
     const channel = db.subscribeToEvents(() => {
-        addNotification("Të dhëna të reja u gjetën! Rifreskim...", "info");
+        addNotification("New data found! Refreshing...", "info");
         fetchEvents(true);
     });
 
@@ -174,7 +174,7 @@ function App() {
     };
   }, []);
 
-  // Deep-link: nëse URL-ja ka ?event=ID, hape automatikisht atë event pas ngarkimit
+  // Deep-link: if the URL has ?event=ID, automatically open that event after loading
   useEffect(() => {
     if (!dataLoaded) return;
     const params = new URLSearchParams(window.location.search);
@@ -185,7 +185,7 @@ function App() {
     }
   }, [dataLoaded]);
 
-  // Përditëso URL-në kur hapet/mbyllet një event, që të jetë e share-ueshme
+  // Update the URL when an event opens/closes, so it's shareable
   useEffect(() => {
     setGalleryIndex(0);
     const url = new URL(window.location.href);
@@ -239,10 +239,10 @@ function App() {
     const newSet = new Set(savedEventIds);
     if (newSet.has(event.id)) {
         newSet.delete(event.id);
-        addNotification(`Eventi u hoq nga të preferuarat.`, 'info');
+        addNotification(`Event removed from favorites.`, 'info');
     } else {
         newSet.add(event.id);
-        addNotification(`Eventi u ruajt! Do t'ju njoftojmë 2 orë para fillimit.`, 'success');
+        addNotification(`Event saved! We'll notify you 2 hours before it starts.`, 'success');
     }
     setSavedEventIds(newSet);
   };
@@ -252,10 +252,10 @@ function App() {
     const newSubs = new Set(subscriptions);
     if (newSubs.has(key)) {
         newSubs.delete(key);
-        addNotification(`Njoftimet për ${searchParams.category} në ${searchParams.city} u çaktivizuan.`, 'info');
+        addNotification(`Notifications for ${searchParams.category} in ${searchParams.city} disabled.`, 'info');
     } else {
         newSubs.add(key);
-        addNotification(`U abonuat! Do merrni njoftim kur të ketë evente të reja ${searchParams.category}.`, 'success');
+        addNotification(`Subscribed! You'll get notified when there are new ${searchParams.category} events.`, 'success');
     }
     setSubscriptions(newSubs);
   };
@@ -288,7 +288,7 @@ function App() {
         gallery = await uploadEventImages(venueForm.files);
         if (gallery.length > 0) imageUrl = gallery[0];
       } catch (e) {
-        console.error('Gabim gjatë ngarkimit të fotove:', e);
+        console.error('Error uploading photos:', e);
       }
       setSubmitting(false);
     }
@@ -328,7 +328,7 @@ function App() {
         date: getTodayString(),
         type: 'Techno/House', 
         description: '',
-        price: 'Falas',
+        price: 'Free',
         phone: '',
         files: [],
         wantPromotion: false
@@ -356,11 +356,11 @@ function App() {
         await navigator.share({ title: event.name, text: shareText, url: shareUrl });
         return;
       } catch (e) {
-        // Përdoruesi anuloi ose gabim — vazhdo te fallback
+        // User cancelled or error — continue to fallback
       }
     }
 
-    // Fallback: hap WhatsApp direkt me linkun
+    // Fallback: open WhatsApp directly with the link
     const waText = encodeURIComponent(`${shareText}\n${shareUrl}`);
     window.open(`https://wa.me/?text=${waText}`, '_blank');
   };
@@ -373,16 +373,16 @@ function App() {
       // Fetch immediate to be sure
       fetchEvents();
     } else {
-      setLoginError('Fjalëkalimi i pasaktë');
+      setLoginError('Incorrect password');
     }
   };
 
   const handleDeleteEvent = async (id: string) => {
-    if (confirm('Je i sigurt që dëshiron të fshish këtë event?')) {
+    if (confirm('Are you sure you want to delete this event?')) {
       // Optimistic delete
       setAllEvents(prev => prev.filter(e => e.id !== id));
       await db.deleteEvent(id);
-      addNotification('Eventi u fshi.', 'info');
+      addNotification('Event deleted.', 'info');
     }
   };
 
@@ -390,7 +390,7 @@ function App() {
     if (!editingEvent) return;
     setAllEvents(prev => prev.map(e => e.id === editingEvent.id ? editingEvent : e));
     await db.updateEvent(editingEvent.id, editingEvent);
-    addNotification('Eventi u përditësua.', 'success');
+    addNotification('Event updated.', 'success');
     setEditingEvent(null);
   };
 
@@ -403,7 +403,7 @@ function App() {
         return e;
     }));
     await db.updateEventStatus(id, 'approved', promote);
-    addNotification(promote ? 'Eventi u miratua dhe u SPONSORIZUA!' : 'Eventi u miratua dhe është LIVE!', 'success');
+    addNotification(promote ? 'Event approved and SPONSORED!' : 'Event approved and is now LIVE!', 'success');
   };
 
   const handleAdminLogout = () => {
@@ -415,19 +415,19 @@ function App() {
   const handleChangePassword = async () => {
     const storedPassword = await db.getSetting('admin_password', 'admin123');
     if (oldPass !== storedPassword) {
-      setChangePassMsg('error:Fjalëkalimi aktual është gabim.');
+      setChangePassMsg('error:Current password is incorrect.');
       return;
     }
     if (newPass.length < 4) {
-      setChangePassMsg('error:Fjalëkalimi i ri duhet të ketë të paktën 4 shkronja.');
+      setChangePassMsg('error:New password must be at least 4 characters.');
       return;
     }
     if (newPass !== confirmPass) {
-      setChangePassMsg('error:Fjalëkalimet e reja s\'përputhen.');
+      setChangePassMsg('error:New passwords don\'t match.');
       return;
     }
     await db.setSetting('admin_password', newPass);
-    setChangePassMsg('success:U ndryshua me sukses!');
+    setChangePassMsg('success:Changed successfully!');
     setOldPass(''); setNewPass(''); setConfirmPass('');
     setTimeout(() => { setShowChangePassword(false); setChangePassMsg(''); }, 1500);
   };
@@ -454,7 +454,7 @@ function App() {
               onClick={handleInstallClick}
               className="bg-white/10 hover:bg-white/20 text-white px-3 py-2 rounded-xl text-sm font-bold border border-white/20 animate-pulse hidden sm:block"
             >
-              📲 Instalo
+              📲 Install
             </button>
          )}
 
@@ -475,7 +475,7 @@ function App() {
             onClick={() => setView('venue')}
             className="bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 text-white px-3 py-2 md:px-5 md:py-2.5 rounded-full font-semibold transition-all hover:scale-105 active:scale-95 flex items-center gap-2 text-sm md:text-base"
             >
-            <span>➕</span> <span className="hidden xs:inline">Publiko</span>
+            <span>➕</span> <span className="hidden xs:inline">Publish</span>
             </button>
         )}
       </div>
@@ -529,7 +529,7 @@ function App() {
                 <button
                     onClick={() => handleShareEvent(selectedEvent)}
                     className="absolute top-4 right-20 md:top-6 md:right-24 w-12 h-12 rounded-full flex items-center justify-center border bg-black/40 border-white/20 text-white hover:bg-black/60 transition z-20 backdrop-blur-md active:scale-90 shadow-xl"
-                    title="Shpërndaj eventin"
+                    title="Share the event"
                 >
                     <span className="text-xl">📤</span>
                 </button>
@@ -550,7 +550,7 @@ function App() {
                     </h1>
                     <div className="flex items-center gap-2 text-gray-300 text-sm md:text-base">
                          <span>📍 {selectedEvent.venue}, {selectedEvent.city}</span>
-                         {selectedEvent.status === 'pending' && <span className="text-yellow-400 bg-yellow-400/10 px-2 py-0.5 rounded text-xs border border-yellow-400/20">Në Shqyrtim</span>}
+                         {selectedEvent.status === 'pending' && <span className="text-yellow-400 bg-yellow-400/10 px-2 py-0.5 rounded text-xs border border-yellow-400/20">Under Review</span>}
                     </div>
                 </div>
              </div>
@@ -559,28 +559,28 @@ function App() {
              <div className="px-6 py-8 md:px-10 max-w-4xl mx-auto pb-32">
                  <div className="flex flex-col md:flex-row gap-8">
                      <div className="flex-1">
-                        <h3 className="text-xl font-bold text-white mb-4">Rreth Eventit</h3>
+                        <h3 className="text-xl font-bold text-white mb-4">About the Event</h3>
                         <p className="text-gray-300 leading-relaxed text-lg whitespace-pre-wrap">
                             {selectedEvent.description}
                         </p>
                         
                         <div className="mt-8 p-6 bg-night-card rounded-2xl border border-white/5">
-                            <h4 className="font-bold text-white mb-4 border-b border-white/5 pb-2">Informacion</h4>
+                            <h4 className="font-bold text-white mb-4 border-b border-white/5 pb-2">Information</h4>
                             <div className="space-y-3">
                                 <div className="flex justify-between">
-                                    <span className="text-gray-400">Data</span>
+                                    <span className="text-gray-400">Date</span>
                                     <span className="text-white font-mono">{selectedEvent.date}</span>
                                 </div>
                                 <div className="flex justify-between">
-                                    <span className="text-gray-400">Ora</span>
+                                    <span className="text-gray-400">Time</span>
                                     <span className="text-white font-mono">22:00 (Standard)</span>
                                 </div>
                                 <div className="flex justify-between">
-                                    <span className="text-gray-400">Mosha e lejuar</span>
+                                    <span className="text-gray-400">Age limit</span>
                                     <span className="text-white">18+</span>
                                 </div>
                                 <div className="flex justify-between items-center">
-                                    <span className="text-gray-400">Kontakt (Rezervime)</span>
+                                    <span className="text-gray-400">Contact (Reservations)</span>
                                     <a href={`tel:${selectedEvent.phone}`} className="text-night-accent font-bold hover:underline">{selectedEvent.phone}</a>
                                 </div>
                             </div>
@@ -593,7 +593,7 @@ function App() {
              <div className="fixed bottom-0 left-0 w-full bg-night-card/90 backdrop-blur-lg border-t border-white/10 p-4 md:p-6 z-50">
                 <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
                     <div>
-                        <div className="text-xs text-gray-400 uppercase">Çmimi i Hyrjes</div>
+                        <div className="text-xs text-gray-400 uppercase">Entry Price</div>
                         <div className="text-2xl font-bold text-night-accent">{selectedEvent.price}</div>
                     </div>
                     <a 
@@ -602,7 +602,7 @@ function App() {
                         rel="noopener noreferrer"
                         className="flex-1 bg-white text-night-bg font-bold py-3.5 rounded-xl hover:bg-gray-200 transition active:scale-[0.98] shadow-lg flex items-center justify-center gap-2"
                     >
-                        Rezervo Tani 💬
+                        Reserve Now 💬
                     </a>
                 </div>
              </div>
@@ -619,19 +619,19 @@ function App() {
 
       <div className="relative z-10 max-w-5xl mx-auto px-6 text-center">
         <div className="inline-block mb-6 px-4 py-1.5 rounded-full border border-purple-500/30 bg-purple-500/10 text-purple-300 text-xs md:text-sm font-medium uppercase tracking-wider animate-fade-in">
-          Platforma #1 e Jetës së Natës
+          The #1 Nightlife Platform
         </div>
         
         <h1 className="text-4xl sm:text-5xl md:text-7xl font-extrabold text-white mb-6 md:mb-8 leading-tight drop-shadow-2xl">
-          Mos Rri Në Shtëpi.<br />
+          Don't Stay Home.<br />
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-500 via-purple-500 to-indigo-500 animate-gradient-x">
-            Zbulo Natën Tënde.
+            Discover Your Night.
           </span>
         </h1>
         
         <p className="text-base md:text-xl text-gray-300 mb-8 md:mb-10 max-w-2xl mx-auto leading-relaxed">
-          Gjej eventet më të mira të publikuara direkt nga lokalet në qytetin tënd.
-          Zgjidh datën, gjej vibe-in, dhe dil.
+          Find the best events posted directly by venues in your city.
+          Pick the date, find the vibe, and go out.
         </p>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full sm:w-auto">
@@ -639,7 +639,7 @@ function App() {
             onClick={() => setView('search')}
             className="w-full sm:w-auto px-8 py-4 bg-night-accent hover:bg-rose-700 text-white text-lg font-bold rounded-2xl shadow-xl shadow-rose-900/40 transform transition hover:scale-[1.02] active:scale-[0.98]"
           >
-            Gjej Ku Të Dalësh 🚀
+            Find Where to Go 🚀
           </button>
           
            {installPrompt ? (
@@ -647,14 +647,14 @@ function App() {
              onClick={handleInstallClick}
              className="w-full sm:w-auto px-8 py-4 bg-white text-night-bg hover:bg-gray-200 text-lg font-bold rounded-2xl transition active:scale-[0.98] animate-bounce"
             >
-              📲 Instalo App-in
+              📲 Install the App
             </button>
            ) : (
             <button 
                 onClick={() => setView('venue')}
                 className="w-full sm:w-auto px-8 py-4 bg-night-card hover:bg-slate-800 border border-white/10 text-white text-lg font-semibold rounded-2xl transition active:scale-[0.98]"
             >
-                Je Organizator?
+                Are You an Organizer?
             </button>
            )}
         </div>
@@ -705,7 +705,7 @@ function App() {
                     <div className="absolute top-0 left-0 w-full overflow-hidden">
                         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-yellow-400 via-orange-500 to-yellow-400 animate-shine"></div>
                         <div className="absolute top-4 left-4 bg-gradient-to-r from-yellow-400 to-orange-500 text-black text-xs font-bold px-3 py-1 rounded-full shadow-lg flex items-center gap-1">
-                            💎 Sponsorizuar
+                            💎 Sponsored
                         </div>
                     </div>
                 )}
@@ -735,7 +735,7 @@ function App() {
                 <div className="flex items-center justify-between pt-4 border-t border-white/5">
                     <span className="text-xs text-gray-500 font-medium uppercase">{event.type}</span>
                     <button className={`px-4 py-2 rounded-lg text-sm font-medium transition active:scale-95 ${event.isPromoted ? 'bg-night-gold text-black hover:bg-yellow-300' : 'text-white bg-white/10 hover:bg-white/20'}`}>
-                        Shiko Detajet
+                        View Details
                     </button>
                 </div>
             </div>
@@ -750,24 +750,24 @@ function App() {
     return (
     <div className="min-h-screen pt-24 px-4 pb-12 max-w-5xl mx-auto">
        <button onClick={() => setView('landing')} className="mb-4 md:mb-6 text-gray-400 hover:text-white flex items-center gap-2 transition active:scale-95">
-        ← Kthehu
+        ← Back
       </button>
 
       <div className="bg-night-card rounded-3xl p-6 md:p-8 shadow-2xl border border-white/5">
         <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl md:text-3xl font-bold text-white">Filtro Natën Tënde</h2>
+            <h2 className="text-2xl md:text-3xl font-bold text-white">Filter Your Night</h2>
             <button 
                 onClick={toggleSubscription}
                 className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition ${isSubscribed ? 'bg-night-accent/10 border-night-accent text-night-accent' : 'border-gray-700 text-gray-400 hover:text-white'}`}
             >
                 <span>{isSubscribed ? '🔕' : '🔔'}</span>
-                <span className="text-sm font-bold hidden sm:inline">{isSubscribed ? 'Abonuar' : 'Njoftomë'}</span>
+                <span className="text-sm font-bold hidden sm:inline">{isSubscribed ? 'Subscribed' : 'Notify Me'}</span>
             </button>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="space-y-2">
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Qyteti</label>
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">City</label>
             <div className="relative">
               <select 
                 value={searchParams.city}
@@ -780,7 +780,7 @@ function App() {
             </div>
           </div>
           <div className="space-y-2">
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Data</label>
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Date</label>
             <div className="relative">
               <input 
                 type="date"
@@ -809,22 +809,22 @@ function App() {
           disabled={loading}
           className="w-full mt-8 bg-gradient-to-r from-night-accent to-purple-600 hover:from-rose-600 hover:to-purple-700 text-white font-bold py-4 rounded-xl transition-all shadow-lg flex items-center justify-center gap-3 disabled:opacity-70 active:scale-[0.98]"
         >
-          {loading ? <span className="flex items-center gap-2 animate-pulse">Duke kërkuar...</span> : <><span>🔍</span> Gjej Eventet</>}
+          {loading ? <span className="flex items-center gap-2 animate-pulse">Searching...</span> : <><span>🔍</span> Find Events</>}
         </button>
       </div>
 
       {hasSearched && (
         <div className="mt-10 animate-fade-in">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-2">
-            <h3 className="text-2xl font-bold text-white">Rezultatet ({searchResults.length})</h3>
+            <h3 className="text-2xl font-bold text-white">Results ({searchResults.length})</h3>
             <span className="text-xs sm:text-sm text-gray-400 bg-white/5 px-3 py-1 rounded-full">{searchParams.city} • {searchParams.date}</span>
           </div>
 
           {searchResults.length === 0 ? (
              <div className="text-center py-20 bg-night-card rounded-2xl border border-white/5 border-dashed">
                 <div className="text-4xl mb-4">😔</div>
-                <h3 className="text-xl font-bold text-white">Asnjë event nuk u gjet</h3>
-                <p className="text-gray-400 mt-2 px-4">Provo të ndryshosh kategorinë ose datën.</p>
+                <h3 className="text-xl font-bold text-white">No events found</h3>
+                <p className="text-gray-400 mt-2 px-4">Try changing the category or date.</p>
              </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -843,20 +843,20 @@ function App() {
     return (
         <div className="min-h-screen pt-24 px-4 pb-12 max-w-5xl mx-auto">
              <button onClick={() => setView('landing')} className="mb-4 md:mb-6 text-gray-400 hover:text-white flex items-center gap-2 transition active:scale-95">
-                ← Kthehu
+                ← Back
             </button>
             <div className="flex items-center gap-3 mb-8">
-                <h2 className="text-3xl font-bold text-white">Eventet e Ruajtura</h2>
+                <h2 className="text-3xl font-bold text-white">Saved Events</h2>
                 <span className="bg-night-accent text-white px-3 py-1 rounded-full text-sm font-bold">{savedEvents.length}</span>
             </div>
 
             {savedEvents.length === 0 ? (
                  <div className="text-center py-24 bg-night-card rounded-3xl border border-white/5 border-dashed">
                     <div className="text-5xl mb-6 opacity-50">❤️</div>
-                    <h3 className="text-xl font-bold text-white">Ende asnjë event i preferuar</h3>
-                    <p className="text-gray-400 mt-2 px-4 mb-6">Ruani eventet që ju pëlqejnë duke klikuar zemrën.</p>
+                    <h3 className="text-xl font-bold text-white">No favorite events yet</h3>
+                    <p className="text-gray-400 mt-2 px-4 mb-6">Save events you like by clicking the heart.</p>
                     <button onClick={() => setView('search')} className="bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded-xl font-bold transition">
-                        Gjej Evente
+                        Find Events
                     </button>
                  </div>
             ) : (
@@ -871,78 +871,78 @@ function App() {
   const renderVenueView = () => (
     <div className="min-h-screen pt-24 px-4 pb-12 max-w-3xl mx-auto">
       <button onClick={() => setView('landing')} className="mb-6 text-gray-400 hover:text-white flex items-center gap-2 transition active:scale-95">
-        ← Anulo
+        ← Cancel
       </button>
 
       <div className="bg-night-card rounded-3xl overflow-hidden border border-white/5 shadow-2xl">
         <div className="bg-slate-800/50 p-4 flex items-center justify-center gap-4 border-b border-white/5">
            <div className={`flex items-center gap-2 ${venueStep === 'details' ? 'text-night-accent font-bold' : 'text-gray-400'}`}>
              <span className="w-6 h-6 rounded-full border border-current flex items-center justify-center text-xs">1</span>
-             <span className="text-sm">Detajet</span>
+             <span className="text-sm">Details</span>
            </div>
            <div className="w-8 h-[1px] bg-gray-600"></div>
            <div className={`flex items-center gap-2 ${venueStep === 'success' ? 'text-night-accent font-bold' : 'text-gray-400'}`}>
              <span className="w-6 h-6 rounded-full border border-current flex items-center justify-center text-xs">2</span>
-             <span className="text-sm">Dërgimi</span>
+             <span className="text-sm">Submission</span>
            </div>
         </div>
 
         {venueStep === 'details' ? (
           <div className="p-6 md:p-8 space-y-6">
              <div className="text-center mb-6">
-               <h2 className="text-2xl font-bold text-white mb-2">Publiko Eventin</h2>
-               <p className="text-gray-400 text-sm">Shto eventin në databazën tonë.</p>
+               <h2 className="text-2xl font-bold text-white mb-2">Publish the Event</h2>
+               <p className="text-gray-400 text-sm">Add the event to our database.</p>
              </div>
              <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">Emri i Lokalit</label>
-                        <input type="text" value={venueForm.venueName} onChange={(e) => setVenueForm({...venueForm, venueName: e.target.value})} className="w-full bg-night-bg border border-gray-700 rounded-xl p-3 text-white focus:ring-2 focus:ring-night-accent outline-none text-base" placeholder="psh. Rooftop Tirana" />
+                        <label className="block text-sm font-medium text-gray-300 mb-2">Venue Name</label>
+                        <input type="text" value={venueForm.venueName} onChange={(e) => setVenueForm({...venueForm, venueName: e.target.value})} className="w-full bg-night-bg border border-gray-700 rounded-xl p-3 text-white focus:ring-2 focus:ring-night-accent outline-none text-base" placeholder="e.g. Rooftop Tirana" />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">Emri i Eventit</label>
-                        <input type="text" value={venueForm.eventName} onChange={(e) => setVenueForm({...venueForm, eventName: e.target.value})} className="w-full bg-night-bg border border-gray-700 rounded-xl p-3 text-white focus:ring-2 focus:ring-night-accent outline-none text-base" placeholder="psh. Saturday Night" />
+                        <label className="block text-sm font-medium text-gray-300 mb-2">Event Name</label>
+                        <input type="text" value={venueForm.eventName} onChange={(e) => setVenueForm({...venueForm, eventName: e.target.value})} className="w-full bg-night-bg border border-gray-700 rounded-xl p-3 text-white focus:ring-2 focus:ring-night-accent outline-none text-base" placeholder="e.g. Saturday Night" />
                     </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                    <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Qyteti</label>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">City</label>
                     <select value={venueForm.city} onChange={(e) => setVenueForm({...venueForm, city: e.target.value})} className="w-full bg-night-bg border border-gray-700 rounded-xl p-3 text-white focus:ring-2 focus:ring-night-accent outline-none text-base">
                       {CITIES.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                    </div>
                    <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Data</label>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Date</label>
                     <input type="date" value={venueForm.date} onChange={(e) => setVenueForm({...venueForm, date: e.target.value})} className="w-full bg-night-bg border border-gray-700 rounded-xl p-3 text-white focus:ring-2 focus:ring-night-accent outline-none text-base" />
                    </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                    <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Kategoria</label>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Category</label>
                     <select value={venueForm.type} onChange={(e) => setVenueForm({...venueForm, type: e.target.value})} className="w-full bg-night-bg border border-gray-700 rounded-xl p-3 text-white focus:ring-2 focus:ring-night-accent outline-none text-base">
                       {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                    </div>
                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Çmimi</label>
-                      <input type="text" value={venueForm.price} onChange={(e) => setVenueForm({...venueForm, price: e.target.value})} className="w-full bg-night-bg border border-gray-700 rounded-xl p-3 text-white focus:ring-2 focus:ring-night-accent outline-none text-base" placeholder="psh. 500 LEK" />
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Price</label>
+                      <input type="text" value={venueForm.price} onChange={(e) => setVenueForm({...venueForm, price: e.target.value})} className="w-full bg-night-bg border border-gray-700 rounded-xl p-3 text-white focus:ring-2 focus:ring-night-accent outline-none text-base" placeholder="e.g. 500 LEK" />
                    </div>
                 </div>
                 <div>
-                     <label className="block text-sm font-medium text-gray-300 mb-2">Numri i Telefonit (Rezervime)</label>
+                     <label className="block text-sm font-medium text-gray-300 mb-2">Phone Number (Reservations)</label>
                      <input 
                         type="tel" 
                         value={venueForm.phone} 
                         onChange={(e) => setVenueForm({...venueForm, phone: e.target.value})} 
                         className="w-full bg-night-bg border border-gray-700 rounded-xl p-3 text-white focus:ring-2 focus:ring-night-accent outline-none text-base" 
-                        placeholder="psh. 069 12 34 567" 
+                        placeholder="e.g. 069 12 34 567" 
                     />
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Poster / Foto (deri në 3)</label>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Poster / Photos (up to 3)</label>
                       <input type="file" ref={fileInputRef} multiple accept="image/*" onChange={handleFileChange} className="hidden" disabled={venueForm.files.length >= 3} />
                       <button onClick={() => fileInputRef.current?.click()} disabled={venueForm.files.length >= 3} className="w-full bg-night-bg border border-dashed border-gray-600 hover:border-night-accent rounded-xl p-3 text-gray-400 hover:text-white transition text-sm flex items-center justify-center gap-2 active:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed">
-                        📷 {venueForm.files.length >= 3 ? 'Maksimumi 3 foto' : `Ngarko Foto (${venueForm.files.length}/3)`}
+                        📷 {venueForm.files.length >= 3 ? 'Maximum 3 photos' : `Upload Photos (${venueForm.files.length}/3)`}
                       </button>
                       {venueForm.files.length > 0 && (
                         <div className="flex gap-2 flex-wrap mt-3">
@@ -959,7 +959,7 @@ function App() {
                 {/* Enhanced Monetization Feature UI */}
                 <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/30 p-4 rounded-xl relative overflow-hidden group hover:border-yellow-500/50 transition-colors">
                     <div className="absolute top-0 right-0 bg-yellow-500 text-black text-[10px] font-bold px-2 py-1 rounded-bl-lg shadow-sm">
-                        REKOMANDOHET 🚀
+                        RECOMMENDED 🚀
                     </div>
                     <label className="flex items-center space-x-4 cursor-pointer relative z-10">
                         <div className="relative">
@@ -974,9 +974,9 @@ function App() {
                             </div>
                         </div>
                         <div className="flex-1">
-                            <span className="font-bold text-yellow-400 text-lg block mb-0.5">Sponsorizo Eventin (Premium)</span>
+                            <span className="font-bold text-yellow-400 text-lg block mb-0.5">Sponsor the Event (Premium)</span>
                             <span className="text-xs text-gray-300 block leading-tight">
-                                Shfaq eventin në krye, etiketoje si "Premium" dhe merr 3x më shumë rezervime.
+                                Show the event at the top, tag it as "Premium" and get 3x more reservations.
                                 <span className="block mt-1 font-bold text-yellow-500">+1000 LEK / Event</span>
                             </span>
                         </div>
@@ -984,39 +984,39 @@ function App() {
                 </div>
 
                 <div>
-                   <label className="block text-sm font-medium text-gray-300 mb-2">Përshkrimi</label>
-                   <textarea rows={4} value={venueForm.description} onChange={(e) => setVenueForm({...venueForm, description: e.target.value})} className="w-full bg-night-bg border border-gray-700 rounded-xl p-3 text-white focus:ring-2 focus:ring-night-accent outline-none text-base" placeholder="Përshkruaj atmosferën..." />
+                   <label className="block text-sm font-medium text-gray-300 mb-2">Description</label>
+                   <textarea rows={4} value={venueForm.description} onChange={(e) => setVenueForm({...venueForm, description: e.target.value})} className="w-full bg-night-bg border border-gray-700 rounded-xl p-3 text-white focus:ring-2 focus:ring-night-accent outline-none text-base" placeholder="Describe the atmosphere..." />
                 </div>
              </div>
-             <button onClick={handleSubmitEvent} disabled={submitting || !venueForm.venueName || !venueForm.description || !venueForm.phone} className="w-full bg-night-accent hover:bg-rose-700 text-white font-bold py-4 rounded-xl transition disabled:opacity-50 active:scale-[0.98]">{submitting ? 'Duke ngarkuar fotot...' : 'Dërgo për Miratim 🚀'}</button>
+             <button onClick={handleSubmitEvent} disabled={submitting || !venueForm.venueName || !venueForm.description || !venueForm.phone} className="w-full bg-night-accent hover:bg-rose-700 text-white font-bold py-4 rounded-xl transition disabled:opacity-50 active:scale-[0.98]">{submitting ? 'Uploading photos...' : 'Submit for Approval 🚀'}</button>
           </div>
         ) : (
           <div className="p-10 md:p-12 text-center flex flex-col items-center">
              <div className="w-20 h-20 bg-green-500/20 text-green-500 rounded-full flex items-center justify-center text-4xl mb-6 animate-bounce">
                 ✓
              </div>
-             <h2 className="text-3xl font-bold text-white mb-4">U Dërgua me Sukses!</h2>
+             <h2 className="text-3xl font-bold text-white mb-4">Successfully Submitted!</h2>
              <p className="text-gray-300 mb-8 max-w-md leading-relaxed">
-                Eventi juaj <span className="text-white font-bold">"{venueForm.eventName}"</span> u ruajt në sistem.
+                Your event <span className="text-white font-bold">"{venueForm.eventName}"</span> has been saved in the system.
                 <br /><br />
                 {venueForm.wantPromotion ? (
                     <span className="block bg-yellow-500/10 p-4 rounded-xl text-yellow-400 text-sm mt-2 border border-yellow-500/20 shadow-lg shadow-yellow-900/10">
-                        💎 <strong>Kërkesë Premium!</strong><br/>
-                        Ju lutem transferoni pagesën dhe kontaktoni adminin për aktivizim të menjëhershëm.
+                        💎 <strong>Premium Request!</strong><br/>
+                        Please transfer the payment and contact the admin for immediate activation.
                     </span>
                 ) : (
-                    "Për ta bërë LIVE, ju lutem prisni miratimin e adminit."
+                    "To go LIVE, please wait for admin approval."
                 )}
              </p>
              
              <div className="bg-white/5 border border-white/10 rounded-xl p-6 w-full max-w-sm mb-8">
-                 <p className="text-xs text-gray-400 uppercase font-bold mb-2">Kontakt Admin</p>
+                 <p className="text-xs text-gray-400 uppercase font-bold mb-2">Admin Contact</p>
                  <div className="text-xl text-white font-bold mb-1">068 81 55 866</div>
-                 <div className="text-sm text-green-400">WhatsApp / Telefon</div>
+                 <div className="text-sm text-green-400">WhatsApp / Phone</div>
              </div>
 
              <button onClick={resetVenueForm} className="text-gray-400 hover:text-white underline text-sm">
-                Publiko një event tjetër
+                Publish another event
              </button>
           </div>
         )}
@@ -1033,9 +1033,9 @@ function App() {
                         <div className="w-16 h-16 rounded-full bg-night-accent/20 flex items-center justify-center text-3xl">🔒</div>
                      </div>
                      <h2 className="text-2xl font-bold text-white text-center mb-2">Administrator</h2>
-                     <p className="text-gray-400 text-center mb-8 text-sm">Hyrje vetëm për stafin</p>
+                     <p className="text-gray-400 text-center mb-8 text-sm">Staff login only</p>
                      
-                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Fjalëkalimi</label>
+                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Password</label>
                      <input 
                         type="password" 
                         value={adminPass}
@@ -1052,13 +1052,13 @@ function App() {
                         onClick={handleAdminLogin}
                         className="w-full bg-night-accent hover:bg-rose-700 text-white font-bold py-4 rounded-xl transition shadow-lg shadow-rose-900/30 active:scale-[0.98]"
                     >
-                        Hyr në Panel
+                        Log In to Panel
                     </button>
                     <button 
                         onClick={() => setView('landing')}
                         className="w-full mt-4 text-gray-500 hover:text-white text-sm"
                     >
-                        ← Kthehu
+                        ← Back
                     </button>
                 </div>
             </div>
@@ -1074,7 +1074,7 @@ function App() {
                                 </span>
                             ) : (
                                 <span className="text-orange-400 flex items-center gap-1">
-                                    🟠 Offline (Lokale) <span className="text-gray-500 text-xs">- Mungon API Key në .env</span>
+                                    🟠 Offline (Local) <span className="text-gray-500 text-xs">- Missing API Key in .env</span>
                                 </span>
                             )}
                          </p>
@@ -1084,13 +1084,13 @@ function App() {
                         onClick={() => setShowChangePassword(true)} 
                         className="bg-gray-800 hover:bg-gray-700 text-white px-6 py-2 rounded-xl font-medium border border-white/10 transition active:scale-95 text-sm"
                      >
-                        🔒 Fjalëkalimi
+                        🔒 Password
                      </button>
                      <button 
                         onClick={handleAdminLogout} 
                         className="bg-gray-800 hover:bg-gray-700 text-white px-6 py-2 rounded-xl font-medium border border-white/10 transition active:scale-95 text-sm"
                      >
-                        Dalje
+                        Log Out
                      </button>
                      </div>
                 </div>
@@ -1098,19 +1098,19 @@ function App() {
                 {showChangePassword && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
                         <div className="bg-gray-900 rounded-2xl max-w-sm w-full p-6 border border-white/10">
-                            <h3 className="text-lg font-bold text-white mb-4">Ndrysho Fjalëkalimin</h3>
+                            <h3 className="text-lg font-bold text-white mb-4">Change Password</h3>
                             <div className="space-y-3">
-                                <input type="password" placeholder="Fjalëkalimi aktual" value={oldPass} onChange={(e) => setOldPass(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-pink-500" />
-                                <input type="password" placeholder="Fjalëkalimi i ri" value={newPass} onChange={(e) => setNewPass(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-pink-500" />
-                                <input type="password" placeholder="Konfirmo fjalëkalimin e ri" value={confirmPass} onChange={(e) => setConfirmPass(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-pink-500" />
+                                <input type="password" placeholder="Current password" value={oldPass} onChange={(e) => setOldPass(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-pink-500" />
+                                <input type="password" placeholder="New password" value={newPass} onChange={(e) => setNewPass(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-pink-500" />
+                                <input type="password" placeholder="Confirm new password" value={confirmPass} onChange={(e) => setConfirmPass(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-pink-500" />
                                 {changePassMsg && (
                                     <p className={`text-xs font-semibold ${changePassMsg.startsWith('error') ? 'text-red-400' : 'text-green-400'}`}>
                                         {changePassMsg.split(':')[1]}
                                     </p>
                                 )}
                                 <div className="flex gap-2 pt-2">
-                                    <button onClick={() => { setShowChangePassword(false); setChangePassMsg(''); setOldPass(''); setNewPass(''); setConfirmPass(''); }} className="flex-1 py-2.5 rounded-full bg-gray-800 hover:bg-gray-700 text-white font-bold text-xs uppercase">Anulo</button>
-                                    <button onClick={handleChangePassword} className="flex-1 py-2.5 rounded-full bg-pink-600 hover:bg-pink-500 text-white font-bold text-xs uppercase">Ruaj</button>
+                                    <button onClick={() => { setShowChangePassword(false); setChangePassMsg(''); setOldPass(''); setNewPass(''); setConfirmPass(''); }} className="flex-1 py-2.5 rounded-full bg-gray-800 hover:bg-gray-700 text-white font-bold text-xs uppercase">Cancel</button>
+                                    <button onClick={handleChangePassword} className="flex-1 py-2.5 rounded-full bg-pink-600 hover:bg-pink-500 text-white font-bold text-xs uppercase">Save</button>
                                 </div>
                             </div>
                         </div>
@@ -1120,11 +1120,11 @@ function App() {
                 {editingEvent && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
                         <div className="bg-gray-900 rounded-2xl max-w-lg w-full p-6 border border-white/10 my-8">
-                            <h3 className="text-lg font-bold text-white mb-4">✏️ Ndrysho Eventin</h3>
+                            <h3 className="text-lg font-bold text-white mb-4">✏️ Edit Event</h3>
                             <div className="space-y-3">
-                                <input type="text" placeholder="Emri i eventit" value={editingEvent.name} onChange={(e) => setEditingEvent({ ...editingEvent, name: e.target.value })} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-night-accent" />
+                                <input type="text" placeholder="Event name" value={editingEvent.name} onChange={(e) => setEditingEvent({ ...editingEvent, name: e.target.value })} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-night-accent" />
                                 <div className="grid grid-cols-2 gap-3">
-                                    <input type="text" placeholder="Lokali" value={editingEvent.venue} onChange={(e) => setEditingEvent({ ...editingEvent, venue: e.target.value })} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-night-accent" />
+                                    <input type="text" placeholder="Venue" value={editingEvent.venue} onChange={(e) => setEditingEvent({ ...editingEvent, venue: e.target.value })} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-night-accent" />
                                     <select value={editingEvent.city} onChange={(e) => setEditingEvent({ ...editingEvent, city: e.target.value })} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-night-accent">
                                         {CITIES.map(c => <option key={c} value={c}>{c}</option>)}
                                     </select>
@@ -1136,15 +1136,15 @@ function App() {
                                     </select>
                                 </div>
                                 <div className="grid grid-cols-2 gap-3">
-                                    <input type="text" placeholder="Çmimi" value={editingEvent.price} onChange={(e) => setEditingEvent({ ...editingEvent, price: e.target.value })} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-night-accent" />
-                                    <input type="text" placeholder="Telefoni" value={editingEvent.phone} onChange={(e) => setEditingEvent({ ...editingEvent, phone: e.target.value })} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-night-accent" />
+                                    <input type="text" placeholder="Price" value={editingEvent.price} onChange={(e) => setEditingEvent({ ...editingEvent, price: e.target.value })} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-night-accent" />
+                                    <input type="text" placeholder="Phone" value={editingEvent.phone} onChange={(e) => setEditingEvent({ ...editingEvent, phone: e.target.value })} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-night-accent" />
                                 </div>
-                                <input type="text" placeholder="URL e fotos" value={editingEvent.image} onChange={(e) => setEditingEvent({ ...editingEvent, image: e.target.value })} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-night-accent" />
-                                <textarea rows={3} placeholder="Përshkrimi" value={editingEvent.description} onChange={(e) => setEditingEvent({ ...editingEvent, description: e.target.value })} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-night-accent" />
+                                <input type="text" placeholder="Photo URL" value={editingEvent.image} onChange={(e) => setEditingEvent({ ...editingEvent, image: e.target.value })} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-night-accent" />
+                                <textarea rows={3} placeholder="Description" value={editingEvent.description} onChange={(e) => setEditingEvent({ ...editingEvent, description: e.target.value })} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-night-accent" />
 
                                 <div className="flex gap-2 pt-2">
-                                    <button onClick={() => setEditingEvent(null)} className="flex-1 py-2.5 rounded-full bg-gray-800 hover:bg-gray-700 text-white font-bold text-xs uppercase">Anulo</button>
-                                    <button onClick={handleUpdateEvent} className="flex-1 py-2.5 rounded-full bg-night-accent hover:bg-rose-700 text-white font-bold text-xs uppercase">Ruaj Ndryshimet</button>
+                                    <button onClick={() => setEditingEvent(null)} className="flex-1 py-2.5 rounded-full bg-gray-800 hover:bg-gray-700 text-white font-bold text-xs uppercase">Cancel</button>
+                                    <button onClick={handleUpdateEvent} className="flex-1 py-2.5 rounded-full bg-night-accent hover:bg-rose-700 text-white font-bold text-xs uppercase">Save Changes</button>
                                 </div>
                             </div>
                         </div>
@@ -1157,10 +1157,10 @@ function App() {
                         <div className="flex items-start gap-4">
                             <span className="text-3xl">🛠️</span>
                             <div className="flex-1">
-                                <h3 className="text-xl font-bold text-red-400 mb-2">Vëmendje: Databaza nuk është konfiguruar!</h3>
+                                <h3 className="text-xl font-bold text-red-400 mb-2">Attention: Database is not configured!</h3>
                                 <p className="text-gray-300 text-sm mb-4">
-                                    Tabela <code>events</code> nuk ekziston në Supabase. Aplikacioni po punon në mënyrë lokale (Offline Mode).
-                                    Për të sinkronizuar të dhënat, shkoni tek <strong>Supabase Dashboard &gt; SQL Editor</strong> dhe ekzekutoni kodin e mëposhtëm:
+                                    The <code>events</code> table doesn't exist in Supabase. The app is running locally (Offline Mode).
+                                    To sync the data, go to <strong>Supabase Dashboard &gt; SQL Editor</strong> and run the following code:
                                 </p>
                                 <div className="bg-black/50 p-4 rounded-lg border border-white/10 font-mono text-xs md:text-sm text-green-400 overflow-x-auto select-all">
                                     <pre>{`CREATE TABLE events (
@@ -1200,40 +1200,40 @@ CREATE POLICY "Public Delete" ON events FOR DELETE USING (true);`}</pre>
                     </div>
                     <div className="bg-night-card p-6 rounded-2xl border border-white/5 relative overflow-hidden">
                          <div className="absolute top-0 right-0 p-4 opacity-10 text-6xl">💰</div>
-                        <div className="text-gray-400 mb-1 text-sm font-medium">Fitimet e Pritshme</div>
+                        <div className="text-gray-400 mb-1 text-sm font-medium">Expected Earnings</div>
                         <div className="text-3xl md:text-4xl font-bold text-green-500">
                              {allEvents.filter(e => e.isPromoted).length * 1000} LEK
                         </div>
                         <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
                             <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                            {allEvents.filter(e => e.isPromoted && e.status === 'approved').length} evente të paguara
+                            {allEvents.filter(e => e.isPromoted && e.status === 'approved').length} paid events
                         </div>
                     </div>
                     <div className="bg-night-card p-6 rounded-2xl border border-white/5">
-                         <div className="text-gray-400 mb-1 text-sm font-medium">Total Evente</div>
+                         <div className="text-gray-400 mb-1 text-sm font-medium">Total Events</div>
                          <div className="text-3xl md:text-4xl font-bold text-white">{allEvents.length}</div>
                     </div>
                 </div>
 
                 <div className="bg-night-card rounded-3xl p-4 md:p-8 border border-white/5 shadow-2xl overflow-hidden">
-                    <h3 className="text-xl font-bold text-white mb-6">Lista e Eventeve</h3>
+                    <h3 className="text-xl font-bold text-white mb-6">Events List</h3>
                     
                     {/* Desktop View Table */}
                     <div className="hidden md:block overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
                         <table className="w-full text-left border-collapse min-w-[800px]">
                             <thead>
                                 <tr className="border-b border-gray-700 text-gray-500 text-xs uppercase tracking-wider">
-                                    <th className="py-4 px-4">Statusi</th>
-                                    <th className="py-4 px-4">Eventi</th>
-                                    <th className="py-4 px-4">Vendi</th>
-                                    <th className="py-4 px-4">Data</th>
-                                    <th className="py-4 px-4">Kontakt</th>
-                                    <th className="py-4 px-4 text-right">Veprime (Pagesa)</th>
+                                    <th className="py-4 px-4">Status</th>
+                                    <th className="py-4 px-4">Event</th>
+                                    <th className="py-4 px-4">Venue</th>
+                                    <th className="py-4 px-4">Date</th>
+                                    <th className="py-4 px-4">Contact</th>
+                                    <th className="py-4 px-4 text-right">Actions (Payment)</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {allEvents.length === 0 ? (
-                                    <tr><td colSpan={6} className="py-12 text-center text-gray-500 italic">Asnjë event nuk është në sistem.</td></tr>
+                                    <tr><td colSpan={6} className="py-12 text-center text-gray-500 italic">No events in the system.</td></tr>
                                 ) : (
                                     allEvents.sort((a,b) => (a.status === 'pending' ? -1 : 1)).map(event => (
                                         <tr key={event.id} className={`border-b border-gray-800 transition group ${event.status === 'pending' ? 'bg-yellow-500/5 hover:bg-yellow-500/10' : 'hover:bg-white/5'}`}>
@@ -1275,14 +1275,14 @@ CREATE POLICY "Public Delete" ON events FOR DELETE USING (true);`}</pre>
                                                             <button 
                                                                 onClick={() => handleApproveEvent(event.id, false)}
                                                                 className="bg-green-600 hover:bg-green-500 text-white px-3 py-2 rounded-lg text-xs font-bold transition shadow-lg"
-                                                                title="Konfirmo Thjesht"
+                                                                title="Confirm Simply"
                                                             >
                                                                 Ok
                                                             </button>
                                                             <button 
                                                                 onClick={() => handleApproveEvent(event.id, true)}
                                                                 className="bg-yellow-600 hover:bg-yellow-500 text-white px-3 py-2 rounded-lg text-xs font-bold transition shadow-lg border border-yellow-400/50"
-                                                                title="Konfirmo si Premium (Paguar)"
+                                                                title="Confirm as Premium (Paid)"
                                                             >
                                                                 💎 Ok
                                                             </button>
@@ -1291,14 +1291,14 @@ CREATE POLICY "Public Delete" ON events FOR DELETE USING (true);`}</pre>
                                                     <button 
                                                         onClick={() => setEditingEvent(event)}
                                                         className="bg-blue-500/10 hover:bg-blue-500 text-blue-400 hover:text-white px-3 py-2 rounded-lg text-xs font-bold transition duration-300 border border-blue-500/30"
-                                                        title="Ndrysho"
+                                                        title="Edit"
                                                     >
                                                         ✏️
                                                     </button>
                                                     <button 
                                                         onClick={() => handleDeleteEvent(event.id)}
                                                         className="bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white px-3 py-2 rounded-lg text-xs font-bold transition duration-300 border border-red-500/30"
-                                                        title="Refuzo / Tërhiq"
+                                                        title="Reject / Withdraw"
                                                     >
                                                         🗑️
                                                     </button>
@@ -1314,7 +1314,7 @@ CREATE POLICY "Public Delete" ON events FOR DELETE USING (true);`}</pre>
                     {/* Mobile View Cards */}
                     <div className="md:hidden flex flex-col gap-4">
                         {allEvents.length === 0 ? (
-                            <div className="py-8 text-center text-gray-500 italic">Asnjë event nuk është në sistem.</div>
+                            <div className="py-8 text-center text-gray-500 italic">No events in the system.</div>
                         ) : (
                             allEvents.sort((a,b) => (a.status === 'pending' ? -1 : 1)).map(event => (
                                 <div key={event.id} className={`p-4 rounded-xl border border-white/5 flex flex-col gap-3 ${event.status === 'pending' ? 'bg-yellow-500/5' : 'bg-white/5'}`}>
