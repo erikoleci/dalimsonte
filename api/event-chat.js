@@ -8,7 +8,7 @@
 //   VITE_SUPABASE_ANON_KEY  -> same one the frontend uses (publishable key, safe to reuse)
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODEL = 'gemini-2.5-flash'; // check ai.google.dev/gemini-api/docs/models if this changes
+const GEMINI_MODEL = 'gemini-flash-latest'; // alias that always points to Google's current default Flash model — avoids future 404s when Google retires specific versions
 const SUPABASE_URL = (process.env.VITE_SUPABASE_URL || 'https://ytfemeqepmffxckjeehg.supabase.co')
   .replace(/\/rest\/v1\/?$/, '')
   .replace(/\/+$/, '');
