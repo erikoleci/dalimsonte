@@ -447,8 +447,26 @@ function App() {
         className="flex items-center gap-2 cursor-pointer group" 
         onClick={() => { setView('landing'); setSelectedEvent(null); }}
       >
-        <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gradient-to-tr from-rose-600 to-purple-600 flex items-center justify-center shadow-lg shadow-rose-500/30 group-hover:scale-110 transition-transform">
-          <span className="text-lg md:text-xl">🌙</span>
+        <div className="w-8 h-8 md:w-10 md:h-10 group-hover:scale-110 transition-transform shrink-0">
+          <svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="navLogoMoon" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#e11d48"/>
+                <stop offset="100%" stopColor="#be123c"/>
+              </linearGradient>
+              <linearGradient id="navLogoBars" x1="0%" y1="100%" x2="0%" y2="0%">
+                <stop offset="0%" stopColor="#fbbf24"/>
+                <stop offset="100%" stopColor="#fde68a"/>
+              </linearGradient>
+            </defs>
+            <path d="M 296 96 C 220 96 158 158 158 234 C 158 310 220 372 296 372 C 330 372 361 359 385 338 C 366 349 344 355 321 355 C 251 355 195 299 195 229 C 195 174 231 126 281 108 C 286 106 291 105 296 104 C 296 101 296 99 296 96 Z" fill="url(#navLogoMoon)"/>
+            <g fill="url(#navLogoBars)">
+              <rect x="330" y="248" width="16" height="56" rx="8"/>
+              <rect x="360" y="222" width="16" height="108" rx="8"/>
+              <rect x="390" y="200" width="16" height="152" rx="8"/>
+              <rect x="420" y="234" width="16" height="84" rx="8"/>
+            </g>
+          </svg>
         </div>
         <span className="font-bold text-lg md:text-xl tracking-tight text-white drop-shadow-md">
           Ku Dalim<span className="text-night-accent">Sonte?</span>
