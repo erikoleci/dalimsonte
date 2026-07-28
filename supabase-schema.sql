@@ -78,3 +78,27 @@ drop policy if exists "Public Upload Access for event-images" on storage.objects
 create policy "Public Upload Access for event-images"
 on storage.objects for insert
 with check (bucket_id = 'event-images');
+
+-- =========================================================
+-- ANALYTICS: view/click tracking per event
+-- =========================================================
+alter table events add column if not exists views integer default 0;
+alter table events add column if not exists clicks integer default 0;
+
+-- Atomic increment functions (avoid race conditions with concurrent visitors)
+create or replace function increment_event_views(event_id text)
+returns void as $$
+begin
+  update events set views = coalesce(views, 0) + 1 where id = event_id;
+end;
+$$ language plpgsql security definer;
+
+create or replace function increment_event_clicks(event_id text)
+returns void as $$
+begin
+  update events set clicks = coalesce(clicks, 0) + 1 where id = event_id;
+end;
+$$ language plpgsql security definer;
+
+grant execute on function increment_event_views(text) to anon, authenticated;
+grant execute on function increment_event_clicks(text) to anon, authenticated;

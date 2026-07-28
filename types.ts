@@ -12,6 +12,8 @@ export interface AppEvent {
   phone: string; // Contact number for reservations
   status: 'pending' | 'approved'; // New field for approval workflow
   isPromoted?: boolean; // New field for monetization (Premium events)
+  views?: number; // Analytics: how many times the event was opened
+  clicks?: number; // Analytics: how many times "Reserve Now" was clicked
 }
 
 export interface AppNotification {

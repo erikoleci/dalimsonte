@@ -299,5 +299,26 @@ export const db = {
             }
         }
         return true;
+    },
+
+    // --- Analytics: fire-and-forget view/click tracking (never blocks the UI) ---
+    trackEventView: async (id: string) => {
+        if (isConnected && supabase && !tableMissing) {
+            try {
+                await supabase.rpc('increment_event_views', { event_id: id });
+            } catch (e) {
+                console.warn("View tracking failed (non-critical):", getErrorText(e));
+            }
+        }
+    },
+
+    trackEventClick: async (id: string) => {
+        if (isConnected && supabase && !tableMissing) {
+            try {
+                await supabase.rpc('increment_event_clicks', { event_id: id });
+            } catch (e) {
+                console.warn("Click tracking failed (non-critical):", getErrorText(e));
+            }
+        }
     }
 };

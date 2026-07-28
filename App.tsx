@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { db, uploadEventImages } from './services/supabase';
+import { EventChatWidget } from './components/EventChatWidget';
 import { AppEvent, AppNotification } from './types';
 
 const CITIES = ['Tiranë', 'Durrës', 'Vlorë', 'Shkodër', 'Sarandë', 'Korçë'];
@@ -98,6 +99,13 @@ function App() {
   const [selectedEvent, setSelectedEvent] = useState<AppEvent | null>(null);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
+
+  // Analytics: fire a "view" once per event open (fire-and-forget, never blocks UI)
+  useEffect(() => {
+    if (selectedEvent) {
+      db.trackEventView(selectedEvent.id);
+    }
+  }, [selectedEvent?.id]);
 
   // Admin State
   const [adminPass, setAdminPass] = useState('');
@@ -489,7 +497,7 @@ function App() {
     const photos = selectedEvent.gallery && selectedEvent.gallery.length > 0 ? selectedEvent.gallery : [selectedEvent.image];
 
     return (
-        <div className="fixed inset-0 z-[60] bg-night-bg overflow-y-auto animate-fade-in">
+        <div className="fixed inset-0 z-[60] bg-night-bg overflow-y-auto animate-scale-in">
              {/* Hero Image / Gallery */}
              <div className="relative h-[40vh] md:h-[50vh] w-full">
                 <img src={photos[galleryIndex] || photos[0]} alt={selectedEvent.name} className="w-full h-full object-cover" />
@@ -599,6 +607,7 @@ function App() {
                         href={getWhatsAppReserveUrl(selectedEvent)}
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={() => db.trackEventClick(selectedEvent.id)}
                         className="flex-1 bg-white text-night-bg font-bold py-3.5 rounded-xl hover:bg-gray-200 transition active:scale-[0.98] shadow-lg flex items-center justify-center gap-2"
                     >
                         Reserve Now 💬
@@ -688,7 +697,7 @@ function App() {
         <div 
         key={event.id} 
         onClick={() => setSelectedEvent(event)}
-        className={`bg-night-card rounded-2xl overflow-hidden border shadow-xl hover:shadow-2xl transition group flex flex-col cursor-pointer active:scale-[0.98] relative ${event.isPromoted ? 'border-night-gold/50 shadow-night-gold/10' : 'border-white/5 hover:border-night-accent/30'}`}
+        className={`bg-night-card rounded-2xl overflow-hidden border shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 ease-out group flex flex-col cursor-pointer active:scale-[0.98] active:translate-y-0 relative animate-fade-in-up ${event.isPromoted ? 'border-night-gold/50 shadow-night-gold/10 hover:shadow-night-gold/20' : 'border-white/5 hover:border-night-accent/30'}`}
         >
             <div className="h-48 overflow-hidden relative">
                 <img src={event.image} alt={event.name} className="w-full h-full object-cover group-hover:scale-110 transition duration-700" />
@@ -733,8 +742,9 @@ function App() {
                 <p className="text-gray-400 text-sm line-clamp-3 mb-4 flex-1">{event.description}</p>
                 <div className="flex items-center justify-between pt-4 border-t border-white/5">
                     <span className="text-xs text-gray-500 font-medium uppercase">{event.type}</span>
-                    <button className={`px-4 py-2 rounded-lg text-sm font-medium transition active:scale-95 ${event.isPromoted ? 'bg-night-gold text-black hover:bg-yellow-300' : 'text-white bg-white/10 hover:bg-white/20'}`}>
+                    <button className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 active:scale-95 flex items-center gap-1.5 group/btn ${event.isPromoted ? 'bg-night-gold text-black hover:bg-yellow-300' : 'text-white bg-white/10 hover:bg-white/20'}`}>
                         View Details
+                        <span className="transition-transform duration-200 group-hover/btn:translate-x-0.5">→</span>
                     </button>
                 </div>
             </div>
@@ -1214,6 +1224,70 @@ CREATE POLICY "Public Delete" ON events FOR DELETE USING (true);`}</pre>
                     </div>
                 </div>
 
+                {/* Analytics */}
+                <div className="bg-night-card rounded-3xl p-4 md:p-8 border border-white/5 shadow-2xl mb-8 overflow-hidden">
+                    <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-xl font-bold text-white flex items-center gap-2">📊 Analytics</h3>
+                        <span className="text-xs text-gray-500">Views &amp; clicks per event</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+                        <div className="bg-black/20 p-5 rounded-2xl border border-white/5">
+                            <div className="text-gray-400 mb-1 text-sm font-medium">Total Views</div>
+                            <div className="text-3xl font-bold text-indigo-400">
+                                {allEvents.reduce((sum, e) => sum + (e.views || 0), 0).toLocaleString()}
+                            </div>
+                        </div>
+                        <div className="bg-black/20 p-5 rounded-2xl border border-white/5">
+                            <div className="text-gray-400 mb-1 text-sm font-medium">Total Reserve Clicks</div>
+                            <div className="text-3xl font-bold text-emerald-400">
+                                {allEvents.reduce((sum, e) => sum + (e.clicks || 0), 0).toLocaleString()}
+                            </div>
+                        </div>
+                        <div className="bg-black/20 p-5 rounded-2xl border border-white/5">
+                            <div className="text-gray-400 mb-1 text-sm font-medium">Avg. Conversion Rate</div>
+                            <div className="text-3xl font-bold text-yellow-400">
+                                {(() => {
+                                    const totalViews = allEvents.reduce((sum, e) => sum + (e.views || 0), 0);
+                                    const totalClicks = allEvents.reduce((sum, e) => sum + (e.clicks || 0), 0);
+                                    return totalViews > 0 ? `${((totalClicks / totalViews) * 100).toFixed(1)}%` : '—';
+                                })()}
+                            </div>
+                        </div>
+                    </div>
+
+                    <h4 className="text-sm font-bold text-gray-400 uppercase tracking-wide mb-3">Top Events by Views</h4>
+                    <div className="space-y-3">
+                        {allEvents.filter(e => (e.views || 0) > 0).length === 0 ? (
+                            <p className="text-gray-500 text-sm italic py-4 text-center">No views tracked yet — data appears as visitors open events.</p>
+                        ) : (
+                            [...allEvents]
+                                .sort((a, b) => (b.views || 0) - (a.views || 0))
+                                .slice(0, 5)
+                                .map(event => {
+                                    const maxViews = Math.max(...allEvents.map(e => e.views || 0), 1);
+                                    const widthPct = Math.max(((event.views || 0) / maxViews) * 100, 4);
+                                    return (
+                                        <div key={event.id} className="group">
+                                            <div className="flex justify-between items-center mb-1 text-sm">
+                                                <span className="text-white font-medium truncate pr-2">{event.name}</span>
+                                                <span className="text-gray-400 whitespace-nowrap font-mono text-xs">
+                                                    👁️ {event.views || 0} &nbsp; 💬 {event.clicks || 0}
+                                                </span>
+                                            </div>
+                                            <div className="h-2 bg-black/30 rounded-full overflow-hidden">
+                                                <div
+                                                    className="h-full bg-gradient-to-r from-indigo-500 to-night-accent rounded-full transition-all duration-700 ease-out"
+                                                    style={{ width: `${widthPct}%` }}
+                                                />
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                        )}
+                    </div>
+                </div>
+
                 <div className="bg-night-card rounded-3xl p-4 md:p-8 border border-white/5 shadow-2xl overflow-hidden">
                     <h3 className="text-xl font-bold text-white mb-6">Events List</h3>
                     
@@ -1398,6 +1472,7 @@ CREATE POLICY "Public Delete" ON events FOR DELETE USING (true);`}</pre>
       {renderEventDetails()}
       {view === 'venue' && renderVenueView()}
       {view === 'admin' && renderAdminView()}
+      {view !== 'admin' && view !== 'venue' && !selectedEvent && <EventChatWidget position="right" />}
     </div>
   );
 }
