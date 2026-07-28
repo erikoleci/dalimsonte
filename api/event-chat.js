@@ -38,10 +38,15 @@ async function fetchApprovedEvents() {
 
 async function callGemini(contents, systemInstruction) {
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        // New "AQ." Auth keys from AI Studio (issued since mid-2026) must be sent
+        // via this header — the old `?key=` query param no longer works for them.
+        'x-goog-api-key': GEMINI_API_KEY,
+      },
       body: JSON.stringify({
         contents,
         system_instruction: { parts: [{ text: systemInstruction }] },
