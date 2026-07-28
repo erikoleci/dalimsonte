@@ -638,9 +638,70 @@ function App() {
 
   const renderLandingView = () => (
     <div className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden pt-20">
-      <div className="absolute top-0 left-0 w-full h-full bg-night-bg pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[300px] md:w-[500px] h-[300px] md:h-[500px] bg-purple-600/30 rounded-full blur-[80px] md:blur-[120px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[300px] md:w-[500px] h-[300px] md:h-[500px] bg-rose-600/20 rounded-full blur-[80px] md:blur-[120px]" />
+      {/* VIDEO BACKGROUND */}
+      <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none">
+        {/* 
+          VIDEO: Vendos URL-in e videos tende ketu.
+          Shembull: <source src="/video/nightclub.mp4" type="video/mp4" />
+          Ose nga Cloudflare Stream / Supabase Storage.
+        */}
+        <video
+          autoPlay
+          muted
+          loop
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover scale-105"
+          style={{ filter: 'brightness(0.28) saturate(1.6)' }}
+          onError={(e) => { (e.target as HTMLVideoElement).style.display = 'none'; }}
+        >
+          {/* Ndrysho src me video-n tende: /video/hero-bg.mp4 */}
+          <source src="/video/hero-bg.mp4" type="video/mp4" />
+        </video>
+        {/* CSS Animated fallback - shfaqet nese videoja nuk ngarkohet */}
+        <div
+          className="absolute inset-0 w-full h-full"
+          style={{
+            background: 'linear-gradient(135deg, #0f172a 0%, #1a0533 25%, #2d0a1e 50%, #0a0a2e 75%, #0f172a 100%)',
+            backgroundSize: '400% 400%',
+            animation: 'gradientShift 12s ease infinite'
+          }}
+        />
+        <style>{}</style>
+        {/* Floating particles */}
+        {[...Array(12)].map((_, i) => (
+          <div
+            key={i}
+            className="absolute rounded-full"
+            style={{
+              width: `${Math.random() * 4 + 2}px`,
+              height: `${Math.random() * 4 + 2}px`,
+              background: i % 3 === 0 ? '#e11d48' : i % 3 === 1 ? '#8b5cf6' : '#6366f1',
+              top: `${Math.random() * 100}%`,
+              left: `${Math.random() * 100}%`,
+              animation: `particleFloat ${Math.random() * 4 + 4}s ease-in-out infinite`,
+              animationDelay: `${Math.random() * 4}s`,
+              filter: 'blur(0.5px)',
+              boxShadow: `0 0 6px currentColor`,
+            }}
+          />
+        ))}
+        {/* Subtle scanline overlay */}
+        <div
+          className="absolute inset-0 opacity-[0.03] pointer-events-none"
+          style={{
+            backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.1) 2px, rgba(255,255,255,0.1) 3px)',
+          }}
+        />
+        {/* Dark gradient overlay on top of video */}
+        <div className="absolute inset-0 bg-gradient-to-b from-night-bg/60 via-transparent to-night-bg" />
+        {/* Color tint overlays */}
+        <div className="absolute inset-0 bg-gradient-to-tr from-purple-900/40 via-transparent to-rose-900/30" />
+      </div>
+
+      {/* Ambient glow orbs (on top of video) */}
+      <div className="absolute top-0 left-0 w-full h-full pointer-events-none z-[1]">
+        <div className="absolute top-[-10%] left-[-10%] w-[300px] md:w-[500px] h-[300px] md:h-[500px] bg-purple-600/20 rounded-full blur-[100px] md:blur-[140px]" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[300px] md:w-[500px] h-[300px] md:h-[500px] bg-rose-600/15 rounded-full blur-[100px] md:blur-[140px]" />
       </div>
 
       <div className="relative z-10 max-w-5xl mx-auto px-6 text-center">
