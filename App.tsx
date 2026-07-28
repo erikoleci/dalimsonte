@@ -638,84 +638,56 @@ function App() {
 
   const renderLandingView = () => (
     <div className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden pt-20">
-      {/* VIDEO BACKGROUND */}
       <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none">
-        {/* 
-          VIDEO: Vendos URL-in e videos tende ketu.
-          Shembull: <source src="/video/nightclub.mp4" type="video/mp4" />
-          Ose nga Cloudflare Stream / Supabase Storage.
-        */}
-        <video
-          autoPlay
-          muted
-          loop
-          playsInline
-          className="absolute inset-0 w-full h-full object-cover scale-105"
-          style={{ filter: 'brightness(0.28) saturate(1.6)' }}
-          onError={(e) => { (e.target as HTMLVideoElement).style.display = 'none'; }}
-        >
-          {/* Ndrysho src me video-n tende: /video/hero-bg.mp4 */}
-          <source src="/video/hero-bg.mp4" type="video/mp4" />
-        </video>
-        {/* CSS Animated fallback - shfaqet nese videoja nuk ngarkohet */}
         <div
-          className="absolute inset-0 w-full h-full"
+          className="absolute inset-0 w-full h-full z-0"
           style={{
             background: 'linear-gradient(135deg, #0f172a 0%, #1a0533 25%, #2d0a1e 50%, #0a0a2e 75%, #0f172a 100%)',
             backgroundSize: '400% 400%',
             animation: 'gradientShift 12s ease infinite'
           }}
         />
-        <style>{}</style>
-        {/* Floating particles */}
-        {[...Array(12)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute rounded-full"
-            style={{
-              width: `${Math.random() * 4 + 2}px`,
-              height: `${Math.random() * 4 + 2}px`,
-              background: i % 3 === 0 ? '#e11d48' : i % 3 === 1 ? '#8b5cf6' : '#6366f1',
-              top: `${Math.random() * 100}%`,
-              left: `${Math.random() * 100}%`,
-              animation: `particleFloat ${Math.random() * 4 + 4}s ease-in-out infinite`,
-              animationDelay: `${Math.random() * 4}s`,
-              filter: 'blur(0.5px)',
-              boxShadow: `0 0 6px currentColor`,
-            }}
-          />
-        ))}
-        {/* Subtle scanline overlay */}
-        <div
-          className="absolute inset-0 opacity-[0.03] pointer-events-none"
-          style={{
-            backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.1) 2px, rgba(255,255,255,0.1) 3px)',
+        <video
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="auto"
+          poster="/icon-512.png"
+          className="absolute inset-0 w-full h-full object-cover scale-105 z-[1]"
+          style={{ filter: 'brightness(0.38) saturate(1.2)' }}
+          ref={(el) => {
+            if (el) {
+              el.muted = true;
+              const playPromise = el.play();
+              if (playPromise) playPromise.catch(() => {});
+            }
           }}
-        />
-        {/* Dark gradient overlay on top of video */}
-        <div className="absolute inset-0 bg-gradient-to-b from-night-bg/60 via-transparent to-night-bg" />
-        {/* Color tint overlays */}
-        <div className="absolute inset-0 bg-gradient-to-tr from-purple-900/40 via-transparent to-rose-900/30" />
+          onCanPlay={(e) => {
+            const v = e.currentTarget;
+            v.muted = true;
+            const playPromise = v.play();
+            if (playPromise) playPromise.catch(() => {});
+          }}
+        >
+          <source src="/video/hero-bg.mp4" type="video/mp4" />
+        </video>
+        <div className="absolute inset-0 z-10 bg-gradient-to-b from-black/55 via-black/20 to-night-bg" />
+        <div className="absolute inset-0 z-10 bg-gradient-to-tr from-purple-900/20 via-transparent to-rose-900/20" />
       </div>
 
-      {/* Ambient glow orbs (on top of video) */}
-      <div className="absolute top-0 left-0 w-full h-full pointer-events-none z-[1]">
-        <div className="absolute top-[-10%] left-[-10%] w-[300px] md:w-[500px] h-[300px] md:h-[500px] bg-purple-600/20 rounded-full blur-[100px] md:blur-[140px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[300px] md:w-[500px] h-[300px] md:h-[500px] bg-rose-600/15 rounded-full blur-[100px] md:blur-[140px]" />
-      </div>
-
-      <div className="relative z-10 max-w-5xl mx-auto px-6 text-center">
+      <div className="relative z-30 max-w-5xl mx-auto px-6 text-center">
         <div className="inline-block mb-6 px-4 py-1.5 rounded-full border border-purple-500/30 bg-purple-500/10 text-purple-300 text-xs md:text-sm font-medium uppercase tracking-wider animate-fade-in">
           The #1 Nightlife Platform
         </div>
-        
+
         <h1 className="text-4xl sm:text-5xl md:text-7xl font-extrabold text-white mb-6 md:mb-8 leading-tight drop-shadow-2xl">
           Don't Stay Home.<br />
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-500 via-purple-500 to-indigo-500 animate-gradient-x">
             Discover Your Night.
           </span>
         </h1>
-        
+
         <p className="text-base md:text-xl text-gray-300 mb-8 md:mb-10 max-w-2xl mx-auto leading-relaxed">
           Find the best events posted directly by venues in your city.
           Pick the date, find the vibe, and go out.
@@ -728,7 +700,7 @@ function App() {
           >
             Find Where to Go 🚀
           </button>
-          
+
            {installPrompt ? (
             <button 
              onClick={handleInstallClick}
@@ -759,8 +731,7 @@ function App() {
             </div>
           ))}
         </div>
-        
-        {/* Secret Admin Trigger - Invisible Box in Bottom Right */}
+
         <div 
             onClick={() => setView('admin')} 
             className="fixed bottom-0 right-0 w-10 h-10 z-50 cursor-default"
