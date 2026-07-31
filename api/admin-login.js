@@ -6,7 +6,7 @@
 // Env vars needed:
 //   ADMIN_SESSION_SECRET       -> any long random string, e.g. `openssl rand -hex 32`
 //   ADMIN_PASSWORD             -> initial/fallback admin password (change it after first login)
-//   SUPABASE_SERVICE_ROLE_KEY  -> from Supabase dashboard -> Settings -> API (service_role, secret)
+//   service_role  -> from Supabase dashboard -> Settings -> API (service_role, secret)
 //   VITE_SUPABASE_URL
 
 import { enforceRateLimit, signAdminToken, supabaseServiceHeaders, supabaseUrl } from './_lib/security.js';

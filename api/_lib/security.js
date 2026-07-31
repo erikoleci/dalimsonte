@@ -83,10 +83,10 @@ export function requireAdmin(req, res) {
 }
 
 // ---------- Service-role Supabase access (server-only, bypasses RLS) ----------
-// SUPABASE_SERVICE_ROLE_KEY must NEVER be prefixed with VITE_ (that would ship it to the browser).
+// This env var (named "service_role" in Vercel) must NEVER be prefixed with VITE_ (that would ship it to the browser).
 export function supabaseServiceHeaders() {
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!key) throw new Error('SUPABASE_SERVICE_ROLE_KEY is not set');
+  const key = process.env.service_role;
+  if (!key) throw new Error('service_role env var is not set');
   return { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' };
 }
 
