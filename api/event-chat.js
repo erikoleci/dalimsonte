@@ -7,6 +7,8 @@
 //   VITE_SUPABASE_URL       -> same one the frontend uses
 //   VITE_SUPABASE_ANON_KEY  -> same one the frontend uses (publishable key, safe to reuse)
 
+import { enforceRateLimit } from './_lib/security.js';
+
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_MODEL = 'gemini-flash-latest'; // alias that always points to Google's current default Flash model — avoids future 404s when Google retires specific versions
 const SUPABASE_URL = (process.env.VITE_SUPABASE_URL || 'https://ytfemeqepmffxckjeehg.supabase.co')
@@ -65,10 +67,18 @@ export default async function handler(req, res) {
     return;
   }
 
+  // 15 messages/minute per IP — enough for real conversation, blunt enough to stop
+  // someone scripting requests to drain the Gemini quota / run up the bill.
+  if (!enforceRateLimit(req, res, { windowMs: 60 * 1000, max: 15, bucket: 'event-chat' })) return;
+
   try {
     const { message, history = [] } = req.body || {};
     if (!message) {
       res.status(400).json({ error: 'Missing message' });
+      return;
+    }
+    if (typeof message !== 'string' || message.length > 500) {
+      res.status(400).json({ error: 'Message too long' });
       return;
     }
     if (!GEMINI_API_KEY) {

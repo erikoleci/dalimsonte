@@ -86,6 +86,45 @@ export const uploadEventImages = async (files: File[]): Promise<string[]> => {
     return urls;
 };
 
+// ---------- Admin auth + moderation actions ----------
+// These now go through /api/admin-login.js and /api/admin-actions.js instead
+// of writing to Supabase directly with the anon key. See supabase-schema-secure.sql
+// for why: the anon key can no longer update/delete events or touch app_settings at all.
+const ADMIN_TOKEN_STORAGE_KEY = 'kudalim_admin_token';
+
+async function callAdminApi(action: string, payload: any = {}) {
+    const token = localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY) || '';
+    const res = await fetch('/api/admin-actions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-token': token },
+        body: JSON.stringify({ action, payload }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.error || `Admin action "${action}" failed`);
+    return data;
+}
+
+export const adminAuth = {
+    login: async (password: string): Promise<{ ok: boolean; error?: string }> => {
+        try {
+            const res = await fetch('/api/admin-login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) return { ok: false, error: data?.error || 'Login failed' };
+            localStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, data.token);
+            return { ok: true };
+        } catch (e) {
+            return { ok: false, error: 'Network error' };
+        }
+    },
+    isLoggedIn: () => !!localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY),
+    logout: () => localStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY),
+    changePassword: async (newPassword: string) => callAdminApi('changePassword', { newPassword }),
+};
+
 export const db = {
     isConnected: () => isConnected,
     isTableMissing: () => tableMissing,
@@ -208,19 +247,14 @@ export const db = {
         return true;
     },
 
+    // NOTE: approving/editing/deleting events and changing the admin password
+    // used to write to Supabase directly from the browser with the anon key.
+    // The anon key can no longer do any of that (see supabase-schema-secure.sql),
+    // so these now go through the authenticated /api/admin-actions endpoint.
+    // See `adminAuth` above for login/logout and `callAdminApi`-backed methods below.
+
     updateEventStatus: async (id: string, status: 'pending' | 'approved', isPromoted: boolean) => {
-        let updatedDb = false;
-        if (isConnected && supabase && !tableMissing) {
-            try {
-                const { error } = await supabase.from('events').update({ status, is_promoted: isPromoted }).eq('id', id);
-                if (!error) updatedDb = true;
-                else if (isTableMissingError(error)) tableMissing = true;
-            } catch (e) {
-                console.error("Network error updating event:", getErrorText(e));
-            }
-        } 
-        
-        // Always update local storage too/fallback
+        await callAdminApi('approveEvent', { id, promote: isPromoted });
         const events = await db.getEvents();
         const newEvents = events.map(e => e.id === id ? { ...e, status, isPromoted } : e);
         localStorage.setItem('kudalim_events', JSON.stringify(newEvents));
@@ -228,76 +262,28 @@ export const db = {
 
     // Full edit (when the admin makes a mistake and wants to fix the name, date, price, etc.)
     updateEvent: async (id: string, updates: Partial<AppEvent>) => {
-        if (isConnected && supabase && !tableMissing) {
-            try {
-                const payload: any = { ...updates };
-                if ('isPromoted' in payload) {
-                    payload.is_promoted = payload.isPromoted;
-                    delete payload.isPromoted;
-                }
-                if ('gallery' in payload) {
-                    payload.gallery_urls = payload.gallery;
-                    delete payload.gallery;
-                }
-                delete payload.id;
-                const { error } = await supabase.from('events').update(payload).eq('id', id);
-                if (error && isTableMissingError(error)) tableMissing = true;
-            } catch (e) {
-                console.error("Network error editing event:", getErrorText(e));
-            }
-        }
-
+        await callAdminApi('updateEvent', { id, updates });
         const events = await db.getEvents();
         const newEvents = events.map(e => e.id === id ? { ...e, ...updates } : e);
         localStorage.setItem('kudalim_events', JSON.stringify(newEvents));
     },
 
     deleteEvent: async (id: string) => {
-        if (isConnected && supabase && !tableMissing) {
-            try {
-               const { error } = await supabase.from('events').delete().eq('id', id);
-               if (isTableMissingError(error)) tableMissing = true;
-            } catch (e) {
-               console.error("Network error deleting event:", getErrorText(e));
-            }
-        }
-
+        await callAdminApi('deleteEvent', { id });
         const events = await db.getEvents();
         const newEvents = events.filter(e => e.id !== id);
         localStorage.setItem('kudalim_events', JSON.stringify(newEvents));
     },
 
-    // --- App Settings (e.g. the admin password) — stored in the DB, not locally,
-    // so they're the same for anyone who logs in, from any device.
+    // --- App Settings: non-sensitive, per-device only now (admin password moved
+    // to the server-only flow in `adminAuth`, since app_settings is no longer
+    // readable/writable by the browser at all).
     getSetting: async (key: string, fallback: string): Promise<string> => {
-        if (isConnected && supabase) {
-            try {
-                const { data, error } = await supabase
-                    .from('app_settings')
-                    .select('value')
-                    .eq('key', key)
-                    .maybeSingle();
-                if (!error && data?.value) return data.value;
-            } catch (e) {
-                console.error("Error fetching setting:", getErrorText(e));
-            }
-        }
         return localStorage.getItem(`kudalim_setting_${key}`) || fallback;
     },
 
     setSetting: async (key: string, value: string): Promise<boolean> => {
-        localStorage.setItem(`kudalim_setting_${key}`, value); // always keep a local fallback
-        if (isConnected && supabase) {
-            try {
-                const { error } = await supabase
-                    .from('app_settings')
-                    .upsert({ key, value }, { onConflict: 'key' });
-                return !error;
-            } catch (e) {
-                console.error("Error saving setting:", getErrorText(e));
-                return false;
-            }
-        }
+        localStorage.setItem(`kudalim_setting_${key}`, value);
         return true;
     },
 

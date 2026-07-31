@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { db, uploadEventImages } from './services/supabase';
+import { db, uploadEventImages, adminAuth } from './services/supabase';
 import { EventChatWidget } from './components/EventChatWidget';
 import { AppEvent, AppNotification } from './types';
 
@@ -373,14 +373,14 @@ function App() {
   };
 
   const handleAdminLogin = async () => {
-    const storedPassword = await db.getSetting('admin_password', 'admin123');
-    if (adminPass === storedPassword) {
+    const result = await adminAuth.login(adminPass);
+    if (result.ok) {
       setIsAuthenticated(true);
       setLoginError('');
       // Fetch immediate to be sure
       fetchEvents();
     } else {
-      setLoginError('Incorrect password');
+      setLoginError(result.error === 'Incorrect password' ? 'Incorrect password' : 'Login failed — try again');
     }
   };
 
@@ -414,14 +414,16 @@ function App() {
   };
 
   const handleAdminLogout = () => {
+      adminAuth.logout();
       setIsAuthenticated(false);
       setAdminPass('');
       setView('landing');
   };
 
   const handleChangePassword = async () => {
-    const storedPassword = await db.getSetting('admin_password', 'admin123');
-    if (oldPass !== storedPassword) {
+    // Re-verify the current password server-side rather than trusting the client.
+    const check = await adminAuth.login(oldPass);
+    if (!check.ok) {
       setChangePassMsg('error:Current password is incorrect.');
       return;
     }
@@ -433,10 +435,14 @@ function App() {
       setChangePassMsg('error:New passwords don\'t match.');
       return;
     }
-    await db.setSetting('admin_password', newPass);
-    setChangePassMsg('success:Changed successfully!');
-    setOldPass(''); setNewPass(''); setConfirmPass('');
-    setTimeout(() => { setShowChangePassword(false); setChangePassMsg(''); }, 1500);
+    try {
+      await adminAuth.changePassword(newPass);
+      setChangePassMsg('success:Changed successfully!');
+      setOldPass(''); setNewPass(''); setConfirmPass('');
+      setTimeout(() => { setShowChangePassword(false); setChangePassMsg(''); }, 1500);
+    } catch (e) {
+      setChangePassMsg('error:Could not change password. Try again.');
+    }
   };
 
   // --- Render Functions ---
@@ -712,6 +718,12 @@ function App() {
               <span className="text-xs md:text-sm font-medium text-gray-300">{item.label}</span>
             </div>
           ))}
+        </div>
+
+        <div className="mt-10 text-center">
+          <a href="/privacy.html" className="text-xs text-gray-500 hover:text-gray-300 underline">
+            Privacy Policy
+          </a>
         </div>
 
         <div 
