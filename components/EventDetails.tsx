@@ -1,10 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { AppEvent } from '../types';
 import { categoryIcon, useI18n } from '../lib/i18n';
-import { buildICS, longDate, relativeLabel } from '../lib/dates';
+import { buildICS, liveStatus, longDate, relativeLabel } from '../lib/dates';
+import { makeStoryImage, posterColor } from '../lib/visuals';
+import { splitArtists } from '../lib/text';
 import { db } from '../services/supabase';
 import { FALLBACK_IMAGE, priceLabel } from './EventCard';
-import { Icon, useLockBody } from './ui';
+import { burstConfetti, Icon, LiveBadge, useLockBody, useNow } from './ui';
 
 interface Props {
   event: AppEvent;
@@ -12,6 +14,7 @@ interface Props {
   onClose: () => void;
   onToggleSave: (e: AppEvent) => void;
   notify: (msg: string, type?: 'success' | 'info' | 'warning') => void;
+  onOpenCollection: (kind: 'venue' | 'artist', name: string) => void;
 }
 
 export function shareUrlFor(event: AppEvent) {
@@ -26,12 +29,46 @@ function whatsappNumber(phone: string) {
   return d;
 }
 
-export const EventDetails: React.FC<Props> = ({ event, saved, onClose, onToggleSave, notify }) => {
+export const EventDetails: React.FC<Props> = ({ event, saved, onClose, onToggleSave, notify, onOpenCollection }) => {
   const { t, cat, lang } = useI18n();
   const photos = event.gallery && event.gallery.length > 0 ? event.gallery : [event.image || FALLBACK_IMAGE];
   const [idx, setIdx] = useState(0);
   const scroller = useRef<HTMLDivElement>(null);
   useLockBody(true);
+  useNow(30000);
+  const [accent, setAccent] = useState('255, 61, 127');
+  const [making, setMaking] = useState(false);
+  const status = liveStatus(event.date, event.time, lang);
+
+  useEffect(() => {
+    let alive = true;
+    posterColor(event.image).then((c) => alive && setAccent(c));
+    return () => {
+      alive = false;
+    };
+  }, [event.image]);
+
+  const shareStory = async () => {
+    setMaking(true);
+    try {
+      const blob = await makeStoryImage(event, lang, window.location.host);
+      const file = new File([blob], 'kudalimsonte-story.png', { type: 'image/png' });
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: event.name, text: shareUrlFor(event) });
+      } else {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = file.name;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1500);
+        notify(t('story.saved'), 'success');
+      }
+    } catch (e: any) {
+      if (e?.name !== 'AbortError') notify('Error', 'warning');
+    } finally {
+      setMaking(false);
+    }
+  };
 
   useEffect(() => {
     db.track(event.id, 'view');
@@ -81,7 +118,13 @@ export const EventDetails: React.FC<Props> = ({ event, saved, onClose, onToggleS
   };
 
   return (
-    <div className="fixed inset-0 z-[90] overflow-y-auto bg-night-bg animate-scale-in" role="dialog" aria-modal="true" aria-label={event.name}>
+    <div
+      className="fixed inset-0 z-[90] overflow-y-auto bg-night-bg animate-scale-in"
+      role="dialog"
+      aria-modal="true"
+      aria-label={event.name}
+      style={{ backgroundImage: `radial-gradient(120% 60% at 50% 55%, rgba(${accent}, 0.22), transparent 70%)`, transition: 'background-image 600ms' }}
+    >
       {/* Gallery */}
       <div className="relative h-[58vh] min-h-[360px] w-full md:h-[64vh]">
         <div
@@ -116,7 +159,8 @@ export const EventDetails: React.FC<Props> = ({ event, saved, onClose, onToggleS
               onClick={() => onToggleSave(event)}
               aria-pressed={saved}
               aria-label={t('nav.saved')}
-              className={`flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-md transition active:scale-90 ${saved ? 'bg-night-accent text-white' : 'bg-black/40 text-white'}`}
+              key={saved ? 'on' : 'off'}
+              className={`${saved ? 'animate-pop' : ''} flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-md transition active:scale-90 ${saved ? 'bg-night-accent text-white' : 'bg-black/40 text-white'}`}
             >
               <Icon.Heart filled={saved} />
             </button>
@@ -141,9 +185,10 @@ export const EventDetails: React.FC<Props> = ({ event, saved, onClose, onToggleS
 
         <div className="absolute inset-x-0 bottom-0 mx-auto max-w-3xl px-5 pb-6 md:px-8">
           <div className="mb-3 flex flex-wrap gap-2">
-            <span className="rounded-full bg-night-accent px-3 py-1 text-xs font-bold uppercase tracking-wide text-white">
+            <span className="rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide text-white" style={{ background: `rgb(${accent})`, color: '#0b0a12' }}>
               {relativeLabel(event.date, lang)}
             </span>
+            <LiveBadge status={status} className="!text-xs" />
             <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
               {categoryIcon(event.type)} {cat(event.type)}
             </span>
@@ -154,10 +199,18 @@ export const EventDetails: React.FC<Props> = ({ event, saved, onClose, onToggleS
             )}
           </div>
           <h1 className="font-display text-3xl font-bold leading-[1.05] text-white [text-wrap:balance] md:text-5xl">{event.name}</h1>
-          {event.artists && <p className="mt-2 text-lg font-semibold text-night-accent">🎤 {event.artists}</p>}
-          <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-1.5 text-white/80 hover:text-white">
-            <Icon.Pin /> {event.venue}, {event.city}
-          </a>
+          {event.artists && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {splitArtists(event.artists).map((a) => (
+                <button key={a} onClick={() => onOpenCollection('artist', a)} className="rounded-full px-3 py-1 text-sm font-bold transition hover:brightness-110" style={{ background: `rgba(${accent}, 0.18)`, color: `rgb(${accent})` }}>
+                  🎤 {a}
+                </button>
+              ))}
+            </div>
+          )}
+          <button onClick={() => onOpenCollection('venue', event.venue)} className="mt-3 inline-flex items-center gap-1.5 text-white/80 underline-offset-4 hover:text-white hover:underline">
+            <Icon.Pin /> {event.venue}, {event.city} <span className="text-white/40">→</span>
+          </button>
         </div>
       </div>
 
@@ -174,6 +227,20 @@ export const EventDetails: React.FC<Props> = ({ event, saved, onClose, onToggleS
           <ActionBtn onClick={addToCalendar} icon={<Icon.Calendar className="h-5 w-5" />} label={t('details.calendar')} />
           <ActionBtn onClick={share} icon={<Icon.Share />} label={t('details.share')} />
         </div>
+
+        <button
+          onClick={shareStory}
+          disabled={making}
+          className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#feda75] via-[#d62976] to-[#4f5bd5] px-5 py-3.5 font-bold text-white shadow-lg transition hover:brightness-110 active:scale-[0.98] disabled:opacity-60"
+        >
+          <Icon.Instagram className="h-5 w-5" /> {making ? t('story.making') : t('story.share')}
+        </button>
+
+        {(event.views || 0) >= 10 && (
+          <p className="mt-4 text-center text-sm text-night-muted">
+            👀 <span className="font-bold text-white">{event.views}</span> {t('trending.seen')}
+          </p>
+        )}
 
         <section className="mt-8">
           <h2 className="label">{t('details.about')}</h2>
@@ -217,7 +284,10 @@ export const EventDetails: React.FC<Props> = ({ event, saved, onClose, onToggleS
             href={waUrl}
             target="_blank"
             rel="noopener noreferrer"
-            onClick={() => db.track(event.id, 'click')}
+            onClick={(ev) => {
+              db.track(event.id, 'click');
+              burstConfetti(ev.clientX, ev.clientY);
+            }}
             className="flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl bg-[#25D366] text-base font-bold text-[#062b16] shadow-[0_10px_40px_-10px_rgba(37,211,102,.6)] transition hover:brightness-105 active:scale-[0.98]"
           >
             <Icon.WhatsApp /> {t('details.reserve')}

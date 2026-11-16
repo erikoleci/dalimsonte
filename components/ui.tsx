@@ -147,3 +147,44 @@ export function useLockBody(locked: boolean) {
     };
   }, [locked]);
 }
+
+/** Re-renders the component every `ms` so countdowns stay live. */
+export function useNow(ms = 30000) {
+  const [, setTick] = React.useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), ms);
+    return () => clearInterval(id);
+  }, [ms]);
+}
+
+/** Small celebratory burst (pure DOM + CSS, no library). */
+export function burstConfetti(x: number, y: number) {
+  if (typeof window === 'undefined' || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const colors = ['#ff3d7f', '#7c5cff', '#ffc94d', '#3ee08f', '#ffffff'];
+  const root = document.createElement('div');
+  root.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:300;overflow:hidden';
+  for (let i = 0; i < 28; i++) {
+    const p = document.createElement('span');
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 60 + Math.random() * 120;
+    const size = 5 + Math.random() * 6;
+    p.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:${size}px;height:${size * 0.6}px;border-radius:2px;background:${
+      colors[i % colors.length]
+    };--dx:${Math.cos(angle) * dist}px;--dy:${Math.sin(angle) * dist - 60}px;--r:${Math.random() * 720 - 360}deg;animation:confetti 900ms cubic-bezier(.2,.7,.3,1) forwards`;
+    root.appendChild(p);
+  }
+  document.body.appendChild(root);
+  setTimeout(() => root.remove(), 1000);
+}
+
+export const LiveBadge = ({ status, className = '' }: { status: { kind: 'soon' | 'live'; label: string } | null; className?: string }) =>
+  status ? (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold backdrop-blur-md ${
+        status.kind === 'live' ? 'bg-night-live/90 text-black' : 'bg-black/50 text-white'
+      } ${className}`}
+    >
+      {status.kind === 'live' ? <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-black" /> : <Icon.Clock className="h-3 w-3" />}
+      {status.label}
+    </span>
+  ) : null;

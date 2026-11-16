@@ -132,3 +132,55 @@ export function buildICS(e: { id: string; name: string; venue: string; city: str
     'END:VCALENDAR',
   ].join('\r\n');
 }
+
+// ---------------------------------------------------------------------------
+// Live countdown helpers
+// ---------------------------------------------------------------------------
+function nowInTirana() {
+  const f = new Intl.DateTimeFormat('en-CA', {
+    timeZone: TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  });
+  const p = Object.fromEntries(f.formatToParts(new Date()).map((x) => [x.type, x.value]));
+  return { ymd: `${p.year}-${p.month}-${p.day}`, minutes: Number(p.hour) * 60 + Number(p.minute) };
+}
+
+function dayIndex(ymd: string) {
+  const [y, m, d] = ymd.split('-').map(Number);
+  return Date.UTC(y, m - 1, d) / 86400000;
+}
+
+/** Minutes from now until the event starts (negative = already started). Default start 22:00. */
+export function minutesUntil(date: string, time?: string): number {
+  const now = nowInTirana();
+  const [h, m] = (time || '22:00').split(':').map(Number);
+  return (dayIndex(date) - dayIndex(now.ymd)) * 1440 + (h * 60 + m) - now.minutes;
+}
+
+export type LiveStatus = { kind: 'soon'; label: string } | { kind: 'live'; label: string } | null;
+
+/** "Fillon për 2o 15m" within 12h, "Po ndodh tani" for ~5h after the start. */
+export function liveStatus(date: string, time: string | undefined, lang: Lang): LiveStatus {
+  const mins = minutesUntil(date, time);
+  if (mins <= 0 && mins > -300) return { kind: 'live', label: lang === 'sq' ? 'Po ndodh tani' : 'Happening now' };
+  if (mins > 0 && mins <= 12 * 60) {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    const txt =
+      lang === 'sq'
+        ? h ? `${h} orë${m ? ` ${m} min` : ''}` : `${m} min`
+        : h ? `${h}h${m ? ` ${m}m` : ''}` : `${m} min`;
+    return { kind: 'soon', label: lang === 'sq' ? `Fillon për ${txt}` : `Starts in ${txt}` };
+  }
+  return null;
+}
+
+export function isSummerSeason(): boolean {
+  const m = Number(todayYMD().slice(5, 7));
+  return m >= 6 && m <= 9;
+}

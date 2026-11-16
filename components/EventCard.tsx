@@ -1,8 +1,8 @@
 import React from 'react';
 import type { AppEvent } from '../types';
 import { categoryIcon, useI18n } from '../lib/i18n';
-import { dateParts, tonightYMD, addDays } from '../lib/dates';
-import { Icon } from './ui';
+import { dateParts, tonightYMD, addDays, liveStatus } from '../lib/dates';
+import { Icon, LiveBadge } from './ui';
 
 export const FALLBACK_IMAGE =
   'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=1000&q=70';
@@ -27,6 +27,8 @@ export const EventCard: React.FC<Props> = ({ event, saved, onOpen, onToggleSave,
   const isTonight = event.date === tonight;
   const isTomorrow = event.date === addDays(tonight, 1);
   const p = dateParts(event.date, lang);
+  const status = liveStatus(event.date, event.time, lang);
+  const hot = (event.views || 0) >= 15;
 
   return (
     <article
@@ -82,7 +84,8 @@ export const EventCard: React.FC<Props> = ({ event, saved, onOpen, onToggleSave,
         }}
         aria-label={t('nav.saved')}
         aria-pressed={saved}
-        className={`absolute right-3.5 top-3.5 flex h-10 w-10 items-center justify-center rounded-full backdrop-blur-md transition active:scale-90 ${
+        key={saved ? 'on' : 'off'}
+        className={`${saved ? 'animate-pop' : ''} absolute right-3.5 top-3.5 flex h-10 w-10 items-center justify-center rounded-full backdrop-blur-md transition active:scale-90 ${
           saved ? 'bg-night-accent text-white' : 'bg-black/35 text-white hover:bg-black/55'
         }`}
       >
@@ -91,6 +94,16 @@ export const EventCard: React.FC<Props> = ({ event, saved, onOpen, onToggleSave,
 
       {/* Bottom content */}
       <div className="absolute inset-x-0 bottom-0 p-5">
+        {(status || hot) && (
+          <div className="mb-2 flex flex-wrap gap-1.5">
+            <LiveBadge status={status} />
+            {hot && (
+              <span className="rounded-full bg-black/50 px-2.5 py-1 text-[11px] font-bold text-white backdrop-blur-md">
+                🔥 {event.views} {t('trending.views')}
+              </span>
+            )}
+          </div>
+        )}
         <div className="mb-2.5 flex flex-wrap items-center gap-1.5">
           <span className="rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-md">
             {categoryIcon(event.type)} {cat(event.type)}

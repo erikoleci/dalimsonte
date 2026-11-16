@@ -70,6 +70,25 @@
   }
 }
 
+@keyframes confetti {
+  0% { transform: translate(0, 0) rotate(0); opacity: 1; }
+  100% { transform: translate(var(--dx), calc(var(--dy) + 160px)) rotate(var(--r)); opacity: 0; }
+}
+@keyframes pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}
+.animate-pop { animation: pop 360ms cubic-bezier(.3,1.6,.5,1); }
+@keyframes storyProgress {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+@keyframes kenburns {
+  from { transform: scale(1.04); }
+  to { transform: scale(1.14) translate(-1%, -1%); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

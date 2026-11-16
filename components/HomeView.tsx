@@ -2,9 +2,11 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { AppEvent, DateFilter } from '../types';
 import { CATEGORIES, CITIES } from '../shared/constants.js';
 import { useI18n } from '../lib/i18n';
-import { dateRange, relativeLabel, tonightYMD } from '../lib/dates';
-import { EventCard, EventCardSkeleton } from './EventCard';
-import { Icon } from './ui';
+import { dateRange, isSummerSeason, relativeLabel, tonightYMD } from '../lib/dates';
+import { EventCard, EventCardSkeleton, FALLBACK_IMAGE as FALLBACK_IMG } from './EventCard';
+import { Icon, useNow } from './ui';
+import { StoriesBar } from './Stories';
+import { normalize, splitArtists } from '../lib/text';
 
 interface Props {
   events: AppEvent[];
@@ -15,7 +17,12 @@ interface Props {
   onPublish: () => void;
   subscriptions: Set<string>;
   onToggleSubscription: (city: string) => void;
+  onOpenCollection: (kind: 'venue' | 'artist', name: string) => void;
 }
+
+const COASTAL = ['Sarandë', 'Ksamil', 'Dhërmi', 'Himarë', 'Vlorë', 'Durrës', 'Shëngjin'];
+
+
 
 const ALL = '__all__';
 
@@ -25,17 +32,6 @@ function readPref(key: string, fallback: string) {
   } catch {
     return fallback;
   }
-}
-
-/** Lowercase + strip diacritics, so "kenga e ores", "këngëtar" and "KENGETAR" all match. */
-export function normalize(str: string) {
-  return (str || '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9@&\s]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
 }
 
 function searchText(e: AppEvent) {
@@ -51,8 +47,11 @@ function sortEvents(list: AppEvent[]) {
   );
 }
 
-export const HomeView: React.FC<Props> = ({ events, loading, savedIds, onOpen, onToggleSave, onPublish, subscriptions, onToggleSubscription }) => {
+export const HomeView: React.FC<Props> = ({ events, loading, savedIds, onOpen, onToggleSave, onPublish, subscriptions, onToggleSubscription, onOpenCollection }) => {
   const { t, lang } = useI18n();
+  useNow(30000); // keeps "Fillon për…" countdowns live
+  const summer = isSummerSeason();
+  const cityOptions = summer ? [...COASTAL, ...CITIES.filter((c) => !COASTAL.includes(c))] : CITIES;
   const [dateFilter, setDateFilter] = useState<DateFilter>('tonight');
   const [customDate, setCustomDate] = useState('');
   const [city, setCity] = useState(() => readPref('kudalim_city', ALL));
@@ -108,6 +107,36 @@ export const HomeView: React.FC<Props> = ({ events, loading, savedIds, onOpen, o
     return (sameCity.length ? sameCity : future).slice(0, 6);
   }, [filtered, events, city, tonight]);
 
+  // Stories: tonight's events (Premium first); if none, what's coming next.
+  const storyEvents = useMemo(() => {
+    const pool = events.filter((e) => (city === ALL || e.city === city) && e.date >= tonight);
+    const tonightList = pool.filter((e) => e.date === tonight);
+    const list = tonightList.length ? tonightList : pool;
+    return { list: sortEvents(list).slice(0, 15), isTonight: tonightList.length > 0 };
+  }, [events, city, tonight]);
+
+  const trending = useMemo(
+    () =>
+      events
+        .filter((e) => e.date >= tonight && (e.views || 0) >= 5)
+        .sort((a, b) => (b.views || 0) - (a.views || 0))
+        .slice(0, 8),
+    [events, tonight]
+  );
+
+  // While searching: suggest artist / venue pages that match
+  const suggestions = useMemo(() => {
+    const q = normalize(query);
+    if (q.length < 2) return { artists: [] as string[], venues: [] as string[] };
+    const artists = new Map<string, string>();
+    const venues = new Map<string, string>();
+    for (const e of events) {
+      for (const a of splitArtists(e.artists)) if (normalize(a).includes(q)) artists.set(normalize(a), a);
+      if (normalize(e.venue).includes(q)) venues.set(normalize(e.venue), e.venue);
+    }
+    return { artists: Array.from(artists.values()).slice(0, 6), venues: Array.from(venues.values()).slice(0, 6) };
+  }, [events, query]);
+
   const groups = useMemo(() => {
     const m = new Map<string, AppEvent[]>();
     for (const e of filtered) m.set(e.date, [...(m.get(e.date) || []), e]);
@@ -161,6 +190,11 @@ export const HomeView: React.FC<Props> = ({ events, loading, savedIds, onOpen, o
             </span>
             {loading ? t('hero.badge') : `${tonightCount} ${t('hero.liveCount')} · ${CITIES.length} ${t('hero.cities')}`}
           </div>
+          {summer && (
+            <div className="mb-6 ml-2 inline-flex items-center rounded-full border border-amber-300/30 bg-amber-300/10 px-3.5 py-1.5 text-xs font-semibold text-amber-200 backdrop-blur animate-fade-in-up">
+              {t('summer.badge')}
+            </div>
+          )}
 
           <h1 className="font-display text-[42px] font-extrabold leading-[0.98] tracking-tight text-white [text-wrap:balance] animate-fade-in-up sm:text-6xl md:text-[88px]">
             {t('hero.title1')}
@@ -201,6 +235,15 @@ export const HomeView: React.FC<Props> = ({ events, loading, savedIds, onOpen, o
           </div>
         </div>
       </section>
+
+      {/* ---------------- STORIES ---------------- */}
+      {!loading && (
+        <StoriesBar
+          events={storyEvents.list}
+          title={storyEvents.isTonight ? `${t('stories.title')}${city !== ALL ? ` · ${city}` : ''}` : t('stories.next')}
+          onOpenEvent={onOpen}
+        />
+      )}
 
       {/* ---------------- FEED ---------------- */}
       <section ref={feedRef} className="relative scroll-mt-16">
@@ -244,9 +287,9 @@ export const HomeView: React.FC<Props> = ({ events, loading, savedIds, onOpen, o
                   aria-label={t('venue.city')}
                 >
                   <option value={ALL}>📍 {t('city.all')}</option>
-                  {CITIES.map((c) => (
+                  {cityOptions.map((c) => (
                     <option key={c} value={c}>
-                      📍 {c}
+                      {summer && COASTAL.includes(c) ? '☀️' : '📍'} {c}
                     </option>
                   ))}
                 </select>
@@ -313,6 +356,21 @@ export const HomeView: React.FC<Props> = ({ events, loading, savedIds, onOpen, o
             )}
           </div>
 
+          {searching && (suggestions.artists.length > 0 || suggestions.venues.length > 0) && (
+            <div className="mb-8 flex flex-wrap items-center gap-2">
+              {suggestions.artists.map((a) => (
+                <button key={`a-${a}`} onClick={() => onOpenCollection('artist', a)} className="chip border-night-accent/40 text-white">
+                  🎤 {a} <span className="text-night-muted">→</span>
+                </button>
+              ))}
+              {suggestions.venues.map((v) => (
+                <button key={`v-${v}`} onClick={() => onOpenCollection('venue', v)} className="chip text-white">
+                  📍 {v} <span className="text-night-muted">→</span>
+                </button>
+              ))}
+            </div>
+          )}
+
           {loading ? (
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {Array.from({ length: 6 }).map((_, i) => (
@@ -369,6 +427,30 @@ export const HomeView: React.FC<Props> = ({ events, loading, savedIds, onOpen, o
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {!searching && !loading && trending.length > 2 && (
+            <div className="mt-16">
+              <h3 className="mb-5 font-display text-xl font-bold text-white">🔥 {t('trending.title')}</h3>
+              <div className="no-scrollbar -mx-5 flex snap-x gap-4 overflow-x-auto px-5 pb-2 md:mx-0 md:px-0">
+                {trending.map((e, i) => (
+                  <button key={e.id} onClick={() => onOpen(e)} className="group relative aspect-[3/4] w-[200px] shrink-0 snap-start overflow-hidden rounded-3xl text-left ring-1 ring-white/10">
+                    <img src={e.image || FALLBACK_IMG} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition duration-700 group-hover:scale-105" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent" />
+                    <span className="absolute left-3 top-3 font-display text-4xl font-extrabold text-white/90 drop-shadow-lg">{i + 1}</span>
+                    <div className="absolute inset-x-0 bottom-0 p-3.5">
+                      <div className="line-clamp-2 font-display text-base font-bold leading-tight text-white">{e.name}</div>
+                      <div className="mt-1 truncate text-xs text-white/70">
+                        {e.venue} · {relativeLabel(e.date, lang)}
+                      </div>
+                      <div className="mt-1.5 text-[11px] font-bold text-night-accent">
+                        🔥 {e.views} {t('trending.views')}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>

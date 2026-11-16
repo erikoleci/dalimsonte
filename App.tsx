@@ -9,21 +9,31 @@ import { EventCard } from './components/EventCard';
 // Loaded on demand: most visitors never open the form or the admin panel.
 const EventDetails = lazy(() => import('./components/EventDetails').then((m) => ({ default: m.EventDetails })));
 const VenueForm = lazy(() => import('./components/VenueForm').then((m) => ({ default: m.VenueForm })));
+const CollectionPage = lazy(() => import('./components/CollectionPage').then((m) => ({ default: m.CollectionPage })));
 const AdminPanel = lazy(() => import('./components/AdminPanel').then((m) => ({ default: m.AdminPanel })));
 const EventChatWidget = lazy(() => import('./components/EventChatWidget').then((m) => ({ default: m.EventChatWidget })));
 import { Icon, Toasts } from './components/ui';
 
-type View = 'home' | 'saved' | 'venue' | 'admin';
+type View = 'home' | 'saved' | 'venue' | 'admin' | 'collection';
+type Collection = { kind: 'venue' | 'artist'; name: string } | null;
 
-// Simple hash routing: #/saved, #/publiko, #/admin
-function viewFromHash(): View {
+// Simple hash routing: #/te-ruajturat, #/publiko, #/admin, #/lokali/<emri>, #/artist/<emri>
+function routeFromHash(): { view: View; collection: Collection } {
   const h = window.location.hash.replace(/^#\/?/, '');
-  if (h === 'saved' || h === 'te-ruajturat') return 'saved';
-  if (h === 'publiko' || h === 'publish') return 'venue';
-  if (h === 'admin') return 'admin';
-  return 'home';
+  const m = /^(lokali|artist)\/(.+)$/.exec(h);
+  if (m) {
+    let name = m[2];
+    try {
+      name = decodeURIComponent(name);
+    } catch {}
+    return { view: 'collection', collection: { kind: m[1] === 'lokali' ? 'venue' : 'artist', name } };
+  }
+  if (h === 'saved' || h === 'te-ruajturat') return { view: 'saved', collection: null };
+  if (h === 'publiko' || h === 'publish') return { view: 'venue', collection: null };
+  if (h === 'admin') return { view: 'admin', collection: null };
+  return { view: 'home', collection: null };
 }
-const HASH: Record<View, string> = { home: '', saved: '#/te-ruajturat', venue: '#/publiko', admin: '#/admin' };
+const HASH: Record<Exclude<View, 'collection'>, string> = { home: '', saved: '#/te-ruajturat', venue: '#/publiko', admin: '#/admin' };
 
 function loadSet(key: string): Set<string> {
   try {
@@ -41,7 +51,8 @@ function saveSet(key: string, s: Set<string>) {
 
 function AppInner() {
   const { t } = useI18n();
-  const [view, setViewState] = useState<View>(viewFromHash);
+  const [view, setViewState] = useState<View>(() => routeFromHash().view);
+  const [collection, setCollection] = useState<Collection>(() => routeFromHash().collection);
   const [cached] = useState(() => readCachedEvents());
   const [events, setEvents] = useState<AppEvent[]>(() => cached || []);
   const [loading, setLoading] = useState(!cached);
@@ -59,9 +70,10 @@ function AppInner() {
     setTimeout(() => setToasts((prev) => prev.filter((n) => n.id !== id)), 3500);
   }, []);
 
-  const setView = (v: View) => {
+  const setView = (v: Exclude<View, 'collection'>) => {
     setSelected(null);
     setViewState(v);
+    setCollection(null);
     const url = new URL(window.location.href);
     url.hash = HASH[v];
     url.searchParams.delete('event');
@@ -71,7 +83,9 @@ function AppInner() {
 
   useEffect(() => {
     const onPop = () => {
-      setViewState(viewFromHash());
+      const route = routeFromHash();
+      setViewState(route.view);
+      setCollection(route.collection);
       const id = new URLSearchParams(window.location.search).get('event');
       setSelected((cur) => (id ? cur : null));
     };
@@ -132,6 +146,18 @@ function AppInner() {
       window.history.replaceState({}, '', url.toString());
     }
     setSelected(null);
+  };
+
+  const openCollection = (kind: 'venue' | 'artist', name: string) => {
+    setSelected(null);
+    setCollection({ kind, name });
+    setViewState('collection');
+    const url = new URL(window.location.href);
+    url.searchParams.delete('event');
+    url.searchParams.delete('q');
+    url.hash = `#/${kind === 'venue' ? 'lokali' : 'artist'}/${encodeURIComponent(name)}`;
+    window.history.pushState({}, '', url.toString());
+    window.scrollTo({ top: 0 });
   };
 
   // ---- Favorites / subscriptions ----
@@ -213,6 +239,7 @@ function AppInner() {
               onPublish={() => setView('venue')}
               subscriptions={subscriptions}
               onToggleSubscription={toggleSubscription}
+              onOpenCollection={openCollection}
             />
           </>
         )}
@@ -246,6 +273,18 @@ function AppInner() {
 
         <Suspense fallback={<div className="min-h-[100svh]" />}>
           {view === 'venue' && <VenueForm onCancel={() => setView('home')} />}
+          {view === 'collection' && collection && (
+            <CollectionPage
+              kind={collection.kind}
+              name={collection.name}
+              events={events}
+              savedIds={savedIds}
+              onOpen={openEvent}
+              onToggleSave={toggleSave}
+              onBack={() => (window.history.length > 1 ? window.history.back() : setView('home'))}
+              notify={notify}
+            />
+          )}
           {view === 'admin' && <AdminPanel onExit={() => setView('home')} notify={notify} />}
         </Suspense>
       </main>
@@ -253,8 +292,8 @@ function AppInner() {
       {view !== 'admin' && <Footer onPublish={() => setView('venue')} />}
 
       <Suspense fallback={selected ? <div className="fixed inset-0 z-[90] bg-night-bg" /> : null}>
-        {selected && <EventDetails event={selected} saved={savedIds.has(selected.id)} onClose={closeEvent} onToggleSave={toggleSave} notify={notify} />}
-        {(view === 'home' || view === 'saved') && !selected && <EventChatWidget position="right" />}
+        {selected && <EventDetails event={selected} saved={savedIds.has(selected.id)} onClose={closeEvent} onToggleSave={toggleSave} notify={notify} onOpenCollection={openCollection} />}
+        {(view === 'home' || view === 'saved' || view === 'collection') && !selected && <EventChatWidget position="right" />}
       </Suspense>
     </div>
   );
