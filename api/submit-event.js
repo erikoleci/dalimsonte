@@ -8,7 +8,7 @@
 // Env vars: service_role (or SUPABASE_SERVICE_ROLE_KEY), TURNSTILE_SECRET_KEY (optional but recommended)
 
 import crypto from 'crypto';
-import { enforceRateLimit, getClientIp, requirePost, sb } from './_lib/security.js';
+import { enforceRateLimit, getClientIp, requirePost, sbWriteTolerant } from './_lib/security.js';
 import { validateEventInput } from './_lib/events.js';
 
 async function verifyTurnstile(token, ip) {
@@ -62,11 +62,7 @@ export default async function handler(req, res) {
       wants_promotion: event.wantsPromotion === true,
     };
 
-    await sb('events', {
-      method: 'POST',
-      headers: { Prefer: 'return=minimal' },
-      body: JSON.stringify(insert),
-    });
+    await sbWriteTolerant('events', 'POST', insert);
 
     return res.status(200).json({ ok: true, id: insert.id });
   } catch (err) {

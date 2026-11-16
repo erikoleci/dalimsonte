@@ -75,7 +75,7 @@ export const db = {
     if (!supabase) return [];
     const { data, error } = await supabase
       .from('events')
-      .select('id,name,venue,city,date,time,type,description,price,image,gallery_urls,phone,instagram,status,is_promoted')
+      .select('*')
       .eq('status', 'approved')
       .gte('date', fromDate)
       .order('date', { ascending: true })

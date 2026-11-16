@@ -138,7 +138,8 @@ function b64url(input) {
 }
 
 export function signAdminToken(pwv, ttlMs = ADMIN_TOKEN_TTL_MS) {
-  if (!SECRET || SECRET.length < 32) throw new Error('ADMIN_SESSION_SECRET is missing or too short (min 32 chars)');
+  if (!SECRET) throw new Error('ADMIN_SESSION_SECRET is not set');
+  if (SECRET.length < 32) console.warn('ADMIN_SESSION_SECRET is short — use at least 32 random characters');
   const payload = JSON.stringify({ exp: Date.now() + ttlMs, pwv });
   const body = b64url(payload);
   const sig = crypto.createHmac('sha256', SECRET).update(body).digest('base64url');
@@ -249,4 +250,21 @@ export function requirePost(req, res) {
     return false;
   }
   return true;
+}
+
+// Writes that keep working even if supabase-schema.sql hasn't been re-run yet:
+// if PostgREST says a column doesn't exist, drop that field and retry.
+export async function sbWriteTolerant(path, method, row, prefer = 'return=minimal') {
+  const body = { ...row };
+  for (let i = 0; i < 6; i++) {
+    try {
+      return await sb(path, { method, headers: { Prefer: prefer }, body: JSON.stringify(body) });
+    } catch (e) {
+      const m = /Could not find the '([a-z_]+)' column/.exec(String(e?.message || ''));
+      if (!m || !(m[1] in body)) throw e;
+      console.warn(`Column "${m[1]}" missing — run supabase-schema.sql. Retrying without it.`);
+      delete body[m[1]];
+    }
+  }
+  throw new Error('Too many missing columns');
 }

@@ -33,7 +33,7 @@ export default async function handler(req, res) {
   if (ID_RE.test(id)) {
     try {
       const rows = await sb(
-        `events?select=name,venue,city,date,time,price,image,description&id=eq.${encodeURIComponent(id)}&status=eq.approved&limit=1`
+        `events?select=*&id=eq.${encodeURIComponent(id)}&status=eq.approved&limit=1`
       );
       event = Array.isArray(rows) ? rows[0] : null;
     } catch {

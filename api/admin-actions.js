@@ -10,6 +10,7 @@ import {
   requireAdmin,
   requirePost,
   sb,
+  sbWriteTolerant,
   setStoredPassword,
   verifyPassword,
 } from './_lib/security.js';
@@ -59,11 +60,7 @@ export default async function handler(req, res) {
         const { row, error } = validateEventInput(payload.updates || {}, { partial: true, trustedImages: true });
         if (error) return res.status(400).json({ error });
         if (!Object.keys(row).length) return res.status(400).json({ error: 'Asgjë për të ndryshuar' });
-        await sb(byId, {
-          method: 'PATCH',
-          headers: { Prefer: 'return=minimal' },
-          body: JSON.stringify(row),
-        });
+        await sbWriteTolerant(byId, 'PATCH', row);
         return res.status(200).json({ ok: true });
       }
 
