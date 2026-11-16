@@ -1,59 +1,56 @@
 // ============ ADMIN LOGIN ============
-// Replaces the old flow of comparing against `app_settings` read directly by the
-// browser with the anon key. That table was (and no longer is) readable/writable
-// by anyone — see supabase-schema-secure.sql.
-//
 // Env vars needed:
-//   ADMIN_SESSION_SECRET       -> any long random string, e.g. `openssl rand -hex 32`
-//   ADMIN_PASSWORD             -> initial/fallback admin password (change it after first login)
-//   service_role  -> from Supabase dashboard -> Settings -> API (service_role, secret)
-//   VITE_SUPABASE_URL
+//   ADMIN_SESSION_SECRET  -> long random string (min 32 chars), e.g. `openssl rand -hex 32`
+//   ADMIN_PASSWORD        -> initial password, used only until you change it in the panel
+//   service_role          -> Supabase dashboard -> Settings -> API -> service_role (secret)
 
-import { enforceRateLimit, signAdminToken, supabaseServiceHeaders, supabaseUrl } from './_lib/security.js';
-
-async function getStoredPassword() {
-  try {
-    const res = await fetch(`${supabaseUrl()}/rest/v1/app_settings?select=value&key=eq.admin_password`, {
-      headers: supabaseServiceHeaders(),
-    });
-    const data = await res.json();
-    return Array.isArray(data) && data[0]?.value ? data[0].value : null;
-  } catch {
-    return null;
-  }
-}
+import {
+  enforceRateLimit,
+  getStoredPassword,
+  hashPassword,
+  isHashed,
+  passwordVersion,
+  requirePost,
+  setStoredPassword,
+  signAdminToken,
+  verifyPassword,
+  ADMIN_TOKEN_TTL_MS,
+} from './_lib/security.js';
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    res.status(405).json({ error: 'Method not allowed' });
-    return;
-  }
+  if (!requirePost(req, res)) return;
 
   // Brute-force protection: 5 attempts per 15 minutes per IP.
-  if (!enforceRateLimit(req, res, { windowMs: 15 * 60 * 1000, max: 5, bucket: 'admin-login' })) return;
+  if (!(await enforceRateLimit(req, res, { windowMs: 15 * 60 * 1000, max: 5, bucket: 'admin-login' }))) return;
 
   try {
     const { password } = req.body || {};
-    if (!password) {
-      res.status(400).json({ error: 'Missing password' });
-      return;
+    if (!password || typeof password !== 'string' || password.length > 200) {
+      return res.status(400).json({ error: 'Fjalëkalimi mungon' });
     }
 
-    const stored = (await getStoredPassword()) || process.env.ADMIN_PASSWORD;
-    if (!stored) {
-      res.status(500).json({ error: 'Admin password is not configured on the server' });
-      return;
+    let stored = await getStoredPassword();
+    if (!stored) return res.status(500).json({ error: 'Fjalëkalimi i adminit nuk është konfiguruar në server' });
+
+    if (!verifyPassword(password, stored)) {
+      return res.status(401).json({ error: 'Fjalëkalim i gabuar' });
     }
 
-    if (password !== stored) {
-      res.status(401).json({ error: 'Incorrect password' });
-      return;
+    // Legacy plaintext password (old app_settings value or ADMIN_PASSWORD env)?
+    // Upgrade it to a scrypt hash on the first successful login.
+    if (!isHashed(stored)) {
+      try {
+        stored = hashPassword(password);
+        await setStoredPassword(stored);
+      } catch (e) {
+        console.warn('Could not migrate admin password to hash', e);
+      }
     }
 
-    const token = signAdminToken();
-    res.status(200).json({ token, expiresInMs: 1000 * 60 * 60 * 6 });
+    const token = signAdminToken(passwordVersion(stored));
+    return res.status(200).json({ token, expiresInMs: ADMIN_TOKEN_TTL_MS });
   } catch (err) {
     console.error('admin-login error:', err);
-    res.status(500).json({ error: 'Server error' });
+    return res.status(500).json({ error: 'Gabim në server' });
   }
 }

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useI18n } from '../lib/i18n';
 
 interface ChatMessage {
   role: 'user' | 'model';
@@ -10,18 +11,19 @@ interface EventChatWidgetProps {
   position?: 'left' | 'right';
 }
 
-const SUGGESTIONS = [
-  'What\'s the best vibe tonight?',
-  'Cheapest events this weekend?',
-  'Anything techno in Tirana?',
-];
 
 export const EventChatWidget: React.FC<EventChatWidgetProps> = ({ position = 'right' }) => {
+  const { t, lang } = useI18n();
+  const SUGGESTIONS = [t('chat.s1'), t('chat.s2'), t('chat.s3')];
   const [isOpen, setIsOpen] = useState(false);
   const [hasOpenedOnce, setHasOpenedOnce] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { role: 'model', text: "Hey! 🌙 I'm your nightlife guide. Tell me your city, vibe or budget and I'll suggest tonight's best events." },
+    { role: 'model', text: t('chat.hello') },
   ]);
+  // Keep the greeting in the current language until the user starts chatting
+  useEffect(() => {
+    setMessages((m) => (m.length === 1 ? [{ role: 'model', text: t('chat.hello') }] : m));
+  }, [lang]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -43,12 +45,12 @@ export const EventChatWidget: React.FC<EventChatWidgetProps> = ({ position = 'ri
       const res = await fetch('/api/event-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: trimmed, history: newMessages.slice(0, -1) }),
+        body: JSON.stringify({ message: trimmed, history: newMessages.slice(1, -1) }),
       });
       const data = await res.json();
-      setMessages((prev) => [...prev, { role: 'model', text: data.reply || "I'm not sure — try the search page!" }]);
+      setMessages((prev) => [...prev, { role: 'model', text: data.reply || t('chat.error') }]);
     } catch {
-      setMessages((prev) => [...prev, { role: 'model', text: "Couldn't reach the assistant right now. Try again in a bit! 🙏" }]);
+      setMessages((prev) => [...prev, { role: 'model', text: t('chat.error') }]);
     } finally {
       setIsLoading(false);
     }
@@ -61,8 +63,8 @@ export const EventChatWidget: React.FC<EventChatWidgetProps> = ({ position = 'ri
     <>
       <button
         onClick={() => { setIsOpen((v) => !v); setHasOpenedOnce(true); }}
-        className={`fixed bottom-24 md:bottom-8 ${sideClass} z-40 w-14 h-14 rounded-full bg-gradient-to-br from-night-accent to-indigo-600 text-white shadow-2xl shadow-rose-950/40 flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 ${!hasOpenedOnce ? 'animate-float' : ''}`}
-        aria-label="Open the nightlife assistant"
+        className={`fixed bottom-6 md:bottom-8 ${sideClass} z-40 w-14 h-14 rounded-full bg-gradient-to-br from-night-accent to-night-accent2 text-white shadow-2xl shadow-rose-950/40 flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 ${!hasOpenedOnce ? 'animate-float' : ''}`}
+        aria-label={t('chat.open')}
       >
         <span className="text-2xl leading-none">{isOpen ? '✕' : '🌙'}</span>
         {!hasOpenedOnce && (
@@ -72,14 +74,14 @@ export const EventChatWidget: React.FC<EventChatWidgetProps> = ({ position = 'ri
 
       {isOpen && (
         <div
-          className={`fixed bottom-40 md:bottom-24 ${sideClass} z-40 w-[92vw] max-w-sm h-[65vh] max-h-[540px] bg-night-card border border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-scale-in`}
+          className={`fixed bottom-24 md:bottom-28 ${sideClass} z-40 w-[92vw] max-w-sm h-[65vh] max-h-[540px] bg-night-card border border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-scale-in`}
         >
           <div className="px-4 py-3.5 bg-gradient-to-r from-night-accent/20 to-indigo-600/20 border-b border-white/10 flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-night-accent to-indigo-600 flex items-center justify-center text-sm shrink-0">🌙</div>
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-night-accent to-night-accent2 flex items-center justify-center text-sm shrink-0">🌙</div>
             <div>
-              <div className="text-sm font-bold text-white leading-tight">Nightlife Guide</div>
+              <div className="text-sm font-bold text-white leading-tight">{t('chat.title')}</div>
               <div className="text-[11px] text-emerald-400 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> AI-powered · live event data
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> {t('chat.status')}
               </div>
             </div>
           </div>
@@ -129,8 +131,8 @@ export const EventChatWidget: React.FC<EventChatWidgetProps> = ({ position = 'ri
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && send()}
-              placeholder="Ask about tonight's events..."
-              className="flex-1 bg-night-bg border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-night-accent transition"
+              placeholder={t('chat.placeholder')}
+              className="flex-1 bg-night-bg border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-night-accent transition"
             />
             <button
               onClick={() => send()}

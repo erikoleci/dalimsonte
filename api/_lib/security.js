@@ -3,18 +3,40 @@
 
 import crypto from 'crypto';
 
-// ---------- Rate limiting (in-memory, per serverless instance) ----------
-// NOTE: on Vercel this resets on cold starts and is per-instance, not global.
-// It still blocks the vast majority of scripted abuse/brute-force for a solo/small app.
-// For real scale, swap this Map for Upstash Redis (a few lines, see comment below).
+// ---------------------------------------------------------------------------
+// Client IP
+// ---------------------------------------------------------------------------
+// On Vercel, `x-real-ip` / `x-vercel-forwarded-for` are set by the platform and
+// cannot be spoofed by the client. `x-forwarded-for` CAN be spoofed (a client
+// can prepend any value), so it is only used as a last resort, taking the
+// right-most entry (the one added by the proxy closest to us).
+export function getClientIp(req) {
+  const h = req.headers || {};
+  const vercel = h['x-vercel-forwarded-for'] || h['x-real-ip'];
+  if (vercel) return String(vercel).split(',')[0].trim();
+  const fwd = h['x-forwarded-for'];
+  if (fwd) {
+    const parts = String(fwd).split(',').map((s) => s.trim()).filter(Boolean);
+    if (parts.length) return parts[parts.length - 1];
+  }
+  return req.socket?.remoteAddress || 'unknown';
+}
+
+// ---------------------------------------------------------------------------
+// Rate limiting
+// ---------------------------------------------------------------------------
+// If UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN are set (free tier on
+// upstash.com), limits are global across all serverless instances.
+// Otherwise falls back to an in-memory map (per instance, resets on cold start).
+const UPSTASH_URL = process.env.UPSTASH_REDIS_REST_URL;
+const UPSTASH_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
 const hits = new Map(); // key -> [timestamps]
 
-export function rateLimit(key, { windowMs, max }) {
+function memoryRateLimit(key, windowMs, max) {
   const now = Date.now();
   const arr = (hits.get(key) || []).filter((t) => now - t < windowMs);
   arr.push(now);
   hits.set(key, arr);
-  // Cheap cleanup so the Map doesn't grow forever on a long-lived instance
   if (hits.size > 5000) {
     for (const [k, v] of hits) {
       if (!v.length || now - v[v.length - 1] > windowMs) hits.delete(k);
@@ -23,73 +45,208 @@ export function rateLimit(key, { windowMs, max }) {
   return { allowed: arr.length <= max, remaining: Math.max(0, max - arr.length) };
 }
 
-export function getClientIp(req) {
-  const fwd = req.headers['x-forwarded-for'];
-  if (fwd) return String(fwd).split(',')[0].trim();
-  return req.socket?.remoteAddress || 'unknown';
+async function upstashRateLimit(key, windowMs, max) {
+  // Fixed-window counter: INCR + PEXPIRE NX in one pipeline call.
+  const windowKey = `rl:${key}:${Math.floor(Date.now() / windowMs)}`;
+  const res = await fetch(`${UPSTASH_URL}/pipeline`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${UPSTASH_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify([
+      ['INCR', windowKey],
+      ['PEXPIRE', windowKey, String(windowMs), 'NX'],
+    ]),
+  });
+  const data = await res.json();
+  const count = Number(data?.[0]?.result || 0);
+  return { allowed: count <= max, remaining: Math.max(0, max - count) };
+}
+
+export async function rateLimit(key, { windowMs, max }) {
+  if (UPSTASH_URL && UPSTASH_TOKEN) {
+    try {
+      return await upstashRateLimit(key, windowMs, max);
+    } catch (e) {
+      console.warn('Upstash rate limit failed, using memory fallback');
+    }
+  }
+  return memoryRateLimit(key, windowMs, max);
 }
 
 // Call this first in every handler. Sends a 429 itself if the limit is hit.
-export function enforceRateLimit(req, res, { windowMs, max, bucket }) {
+export async function enforceRateLimit(req, res, { windowMs, max, bucket }) {
   const ip = getClientIp(req);
-  const { allowed, remaining } = rateLimit(`${bucket}:${ip}`, { windowMs, max });
+  const { allowed, remaining } = await rateLimit(`${bucket}:${ip}`, { windowMs, max });
   res.setHeader('X-RateLimit-Remaining', String(remaining));
   if (!allowed) {
-    res.status(429).json({ error: 'Too many requests. Try again in a bit.' });
+    res.status(429).json({ error: 'Shumë kërkesa. Provo përsëri pas pak.' });
     return false;
   }
   return true;
 }
 
-// ---------- Signed, expiring admin session tokens (HMAC, no external deps) ----------
-// Replaces storing/reading the admin password from a public, anon-writable Supabase table.
+// ---------------------------------------------------------------------------
+// Password hashing (scrypt, built into Node — no extra dependency)
+// Stored format:  scrypt$<saltHex>$<hashHex>
+// ---------------------------------------------------------------------------
+export function hashPassword(password) {
+  const salt = crypto.randomBytes(16);
+  const hash = crypto.scryptSync(String(password), salt, 64);
+  return `scrypt$${salt.toString('hex')}$${hash.toString('hex')}`;
+}
+
+export function safeEqual(a, b) {
+  const ba = Buffer.from(String(a));
+  const bb = Buffer.from(String(b));
+  if (ba.length !== bb.length) {
+    // Still do a comparison so timing doesn't reveal the length difference much
+    crypto.timingSafeEqual(ba, ba);
+    return false;
+  }
+  return crypto.timingSafeEqual(ba, bb);
+}
+
+export function isHashed(stored) {
+  return typeof stored === 'string' && stored.startsWith('scrypt$');
+}
+
+export function verifyPassword(password, stored) {
+  if (!stored || typeof password !== 'string') return false;
+  if (!isHashed(stored)) {
+    // Legacy plaintext value — compare in constant time (caller migrates it to a hash).
+    return safeEqual(password, stored);
+  }
+  const [, saltHex, hashHex] = stored.split('$');
+  const expected = Buffer.from(hashHex, 'hex');
+  const actual = crypto.scryptSync(password, Buffer.from(saltHex, 'hex'), expected.length);
+  return crypto.timingSafeEqual(actual, expected);
+}
+
+// A short fingerprint of the stored password. It goes inside the session token,
+// so changing the password immediately invalidates every existing session.
+export function passwordVersion(stored) {
+  return crypto.createHash('sha256').update(String(stored || '')).digest('base64url').slice(0, 16);
+}
+
+// ---------------------------------------------------------------------------
+// Signed, expiring admin session tokens (HMAC-SHA256)
+// ---------------------------------------------------------------------------
 const SECRET = process.env.ADMIN_SESSION_SECRET;
+export const ADMIN_TOKEN_TTL_MS = 1000 * 60 * 60 * 6; // 6h
 
 function b64url(input) {
   return Buffer.from(input).toString('base64url');
 }
 
-export function signAdminToken(ttlMs = 1000 * 60 * 60 * 6) {
-  if (!SECRET) throw new Error('ADMIN_SESSION_SECRET is not set');
-  const payload = JSON.stringify({ exp: Date.now() + ttlMs });
+export function signAdminToken(pwv, ttlMs = ADMIN_TOKEN_TTL_MS) {
+  if (!SECRET || SECRET.length < 32) throw new Error('ADMIN_SESSION_SECRET is missing or too short (min 32 chars)');
+  const payload = JSON.stringify({ exp: Date.now() + ttlMs, pwv });
   const body = b64url(payload);
   const sig = crypto.createHmac('sha256', SECRET).update(body).digest('base64url');
   return `${body}.${sig}`;
 }
 
-export function verifyAdminToken(token) {
-  if (!SECRET || !token || typeof token !== 'string' || !token.includes('.')) return false;
+function decodeAdminToken(token) {
+  if (!SECRET || !token || typeof token !== 'string' || !token.includes('.')) return null;
   const [body, sig] = token.split('.');
   const expected = crypto.createHmac('sha256', SECRET).update(body).digest('base64url');
-  // Constant-time comparison to avoid timing attacks
-  const a = Buffer.from(sig);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return false;
+  if (!safeEqual(sig, expected)) return null;
   try {
-    const { exp } = JSON.parse(Buffer.from(body, 'base64url').toString());
-    return typeof exp === 'number' && Date.now() < exp;
+    const data = JSON.parse(Buffer.from(body, 'base64url').toString());
+    if (typeof data.exp !== 'number' || Date.now() >= data.exp) return null;
+    return data;
   } catch {
-    return false;
+    return null;
   }
 }
 
-export function requireAdmin(req, res) {
-  const token = req.headers['x-admin-token'] || req.body?.token;
-  if (!verifyAdminToken(token)) {
-    res.status(401).json({ error: 'Not authenticated as admin' });
+// Verifies signature + expiry + that the password hasn't changed since login.
+export async function requireAdmin(req, res) {
+  const token = req.headers['x-admin-token'];
+  const data = decodeAdminToken(token);
+  if (!data) {
+    res.status(401).json({ error: 'Nuk je i identifikuar si admin' });
+    return false;
+  }
+  const stored = await getStoredPassword();
+  if (data.pwv !== passwordVersion(stored)) {
+    res.status(401).json({ error: 'Sesioni ka skaduar, hyr përsëri' });
     return false;
   }
   return true;
 }
 
-// ---------- Service-role Supabase access (server-only, bypasses RLS) ----------
-// This env var (named "service_role" in Vercel) must NEVER be prefixed with VITE_ (that would ship it to the browser).
+// ---------------------------------------------------------------------------
+// Service-role Supabase access (server-only, bypasses RLS)
+// ---------------------------------------------------------------------------
+// The env var is named "service_role" in Vercel. It must NEVER be prefixed with
+// VITE_ (that would ship it to the browser). SUPABASE_SERVICE_ROLE_KEY also works.
 export function supabaseServiceHeaders() {
-  const key = process.env.service_role;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.service_role;
   if (!key) throw new Error('service_role env var is not set');
   return { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' };
 }
 
 export function supabaseUrl() {
-  return (process.env.VITE_SUPABASE_URL || 'https://ytfemeqepmffxckjeehg.supabase.co').replace(/\/+$/, '');
+  return (process.env.VITE_SUPABASE_URL || 'https://ytfemeqepmffxckjeehg.supabase.co')
+    .replace(/\/rest\/v1\/?$/, '')
+    .replace(/\/+$/, '');
+}
+
+export async function sb(path, options = {}) {
+  const res = await fetch(`${supabaseUrl()}/rest/v1/${path}`, {
+    ...options,
+    headers: { ...supabaseServiceHeaders(), ...(options.headers || {}) },
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Supabase ${res.status}: ${text}`);
+  }
+  if (res.status === 204) return null;
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
+
+// Admin password: hashed value in app_settings, or ADMIN_PASSWORD env var as
+// the initial value (before the first "change password").
+export async function getStoredPassword() {
+  try {
+    const data = await sb('app_settings?select=value&key=eq.admin_password');
+    if (Array.isArray(data) && data[0]?.value) return data[0].value;
+  } catch {
+    /* fall through */
+  }
+  return process.env.ADMIN_PASSWORD || null;
+}
+
+export async function setStoredPassword(value) {
+  await sb('app_settings?on_conflict=key', {
+    method: 'POST',
+    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify({ key: 'admin_password', value, updated_at: new Date().toISOString() }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Input helpers
+// ---------------------------------------------------------------------------
+export function cleanString(v, max) {
+  if (v === undefined || v === null) return '';
+  return String(v).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '').trim().slice(0, max);
+}
+
+export function isValidHttpsUrl(v) {
+  try {
+    const u = new URL(v);
+    return u.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+export function requirePost(req, res) {
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed' });
+    return false;
+  }
+  return true;
 }
