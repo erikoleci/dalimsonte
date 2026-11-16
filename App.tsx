@@ -1,15 +1,16 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
 import type { AppEvent, AppNotification } from './types';
-import { db } from './services/supabase';
+import { db, readCachedEvents } from './services/supabase';
 import { I18nProvider, useI18n } from './lib/i18n';
 import { addDays, tonightYMD } from './lib/dates';
 import { Navbar, Footer } from './components/Navbar';
 import { HomeView } from './components/HomeView';
 import { EventCard } from './components/EventCard';
-import { EventDetails } from './components/EventDetails';
-import { VenueForm } from './components/VenueForm';
-import { AdminPanel } from './components/AdminPanel';
-import { EventChatWidget } from './components/EventChatWidget';
+// Loaded on demand: most visitors never open the form or the admin panel.
+const EventDetails = lazy(() => import('./components/EventDetails').then((m) => ({ default: m.EventDetails })));
+const VenueForm = lazy(() => import('./components/VenueForm').then((m) => ({ default: m.VenueForm })));
+const AdminPanel = lazy(() => import('./components/AdminPanel').then((m) => ({ default: m.AdminPanel })));
+const EventChatWidget = lazy(() => import('./components/EventChatWidget').then((m) => ({ default: m.EventChatWidget })));
 import { Icon, Toasts } from './components/ui';
 
 type View = 'home' | 'saved' | 'venue' | 'admin';
@@ -41,8 +42,9 @@ function saveSet(key: string, s: Set<string>) {
 function AppInner() {
   const { t } = useI18n();
   const [view, setViewState] = useState<View>(viewFromHash);
-  const [events, setEvents] = useState<AppEvent[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [cached] = useState(() => readCachedEvents());
+  const [events, setEvents] = useState<AppEvent[]>(() => cached || []);
+  const [loading, setLoading] = useState(!cached);
   const [loadError, setLoadError] = useState(false);
   const [selected, setSelected] = useState<AppEvent | null>(null);
   const [savedIds, setSavedIds] = useState<Set<string>>(() => loadSet('kudalim_favorites'));
@@ -82,46 +84,40 @@ function AppInner() {
   }, []);
 
   // ---- Data ----
+  const knownIds = useRef<Set<string> | null>(cached ? new Set(cached.map((e) => e.id)) : null);
   const fetchEvents = useCallback(async () => {
     try {
       const list = await db.getEvents(addDays(tonightYMD(), -1));
+      const prev = knownIds.current;
+      if (prev && !firstLoad.current && list.some((e) => !prev.has(e.id))) notify(t('toast.newEvents'), 'info');
+      knownIds.current = new Set(list.map((e) => e.id));
       setEvents(list);
       setLoadError(false);
     } catch {
       setLoadError(true);
     } finally {
       setLoading(false);
+      firstLoad.current = false;
     }
-  }, []);
+  }, [t, notify]);
 
   useEffect(() => {
     fetchEvents();
-    let timer: any;
-    const unsubscribe = db.subscribeToEvents(() => {
-      // Debounce bursts of changes
-      clearTimeout(timer);
-      timer = setTimeout(async () => {
-        await fetchEvents();
-        if (!firstLoad.current) notify(t('toast.newEvents'), 'info');
-      }, 800);
-    });
-    const tm = setTimeout(() => (firstLoad.current = false), 3000);
-    return () => {
-      unsubscribe?.();
-      clearTimeout(timer);
-      clearTimeout(tm);
-    };
+    const unsubscribe = db.subscribeToEvents(fetchEvents);
+    return () => unsubscribe?.();
   }, []);
 
   // Deep link: ?event=ID
+  const deepLinked = useRef(false);
   useEffect(() => {
-    if (loading) return;
+    if (deepLinked.current || !events.length) return;
     const id = new URLSearchParams(window.location.search).get('event');
-    if (id) {
-      const found = events.find((e) => e.id === id);
-      if (found) setSelected(found);
-    }
-  }, [loading]);
+    const found = id && events.find((e) => e.id === id);
+    if (found) {
+      deepLinked.current = true;
+      setSelected(found);
+    } else if (!loading) deepLinked.current = true;
+  }, [events, loading]);
 
   const openEvent = (e: AppEvent) => {
     setSelected(e);
@@ -248,14 +244,18 @@ function AppInner() {
           </div>
         )}
 
-        {view === 'venue' && <VenueForm onCancel={() => setView('home')} />}
-        {view === 'admin' && <AdminPanel onExit={() => setView('home')} notify={notify} />}
+        <Suspense fallback={<div className="min-h-[100svh]" />}>
+          {view === 'venue' && <VenueForm onCancel={() => setView('home')} />}
+          {view === 'admin' && <AdminPanel onExit={() => setView('home')} notify={notify} />}
+        </Suspense>
       </main>
 
       {view !== 'admin' && <Footer onPublish={() => setView('venue')} />}
 
-      {selected && <EventDetails event={selected} saved={savedIds.has(selected.id)} onClose={closeEvent} onToggleSave={toggleSave} notify={notify} />}
-      {(view === 'home' || view === 'saved') && !selected && <EventChatWidget position="right" />}
+      <Suspense fallback={selected ? <div className="fixed inset-0 z-[90] bg-night-bg" /> : null}>
+        {selected && <EventDetails event={selected} saved={savedIds.has(selected.id)} onClose={closeEvent} onToggleSave={toggleSave} notify={notify} />}
+        {(view === 'home' || view === 'saved') && !selected && <EventChatWidget position="right" />}
+      </Suspense>
     </div>
   );
 }

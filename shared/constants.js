@@ -41,6 +41,7 @@ export const LIMITS = {
   price: 40,
   phone: 25,
   instagram: 40,
+  artists: 150,
   time: 5,
   maxPhotos: 3,
 };

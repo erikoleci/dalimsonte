@@ -1,31 +1,47 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { AppEvent } from '../types';
 
 // --- Public (browser) Supabase config ---
 // The publishable key is MEANT to be public: with the RLS in supabase-schema.sql
 // it can only read approved events and upload new images. Every write goes
 // through /api/* on the server.
-const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || 'https://ytfemeqepmffxckjeehg.supabase.co';
+// We talk to Supabase's REST API with plain fetch instead of shipping the whole
+// supabase-js library (~110 KB gzipped less JavaScript → much faster first load).
+const SUPABASE_URL = ((import.meta.env.VITE_SUPABASE_URL as string) || 'https://ytfemeqepmffxckjeehg.supabase.co').replace(/\/+$/, '');
 const SUPABASE_KEY =
   (import.meta.env.VITE_SUPABASE_ANON_KEY as string) || 'sb_publishable_JhQVaiJFTKfWGUdVd_u7rw_Q91S5QcO';
 
 export const SUPABASE_PROJECT_REF = new URL(SUPABASE_URL).hostname.split('.')[0];
 
-let supabase: SupabaseClient | null = null;
-try {
-  supabase = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } });
-} catch (e) {
-  console.error('Supabase init error', e);
-}
+const publicHeaders = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` };
 
 function mapRow(e: any): AppEvent {
   return {
     ...e,
     time: e.time || undefined,
     instagram: e.instagram || undefined,
+    artists: e.artists || undefined,
     isPromoted: !!e.is_promoted,
     gallery: Array.isArray(e.gallery_urls) ? e.gallery_urls : [],
   };
+}
+
+// Last successful list, so returning visitors see events instantly.
+const CACHE_KEY = 'kudalim_events_cache_v1';
+export function readCachedEvents(): AppEvent[] | null {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const { ts, events } = JSON.parse(raw);
+    if (Date.now() - ts > 1000 * 60 * 60 * 24) return null;
+    return Array.isArray(events) ? events : null;
+  } catch {
+    return null;
+  }
+}
+function writeCachedEvents(events: AppEvent[]) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), events }));
+  } catch {}
 }
 
 // ---------------------------------------------------------------------------
@@ -50,16 +66,17 @@ async function compressImage(file: File, maxSize = 1600, quality = 0.82): Promis
 }
 
 export async function uploadEventImage(file: File): Promise<string> {
-  if (!supabase) throw new Error('Storage unavailable');
   const blob = await compressImage(file);
-  const ext = blob.type === 'image/webp' ? 'webp' : blob.type === 'image/png' ? 'png' : 'jpg';
+  const type = blob.type || 'image/jpeg';
+  const ext = type === 'image/webp' ? 'webp' : type === 'image/png' ? 'png' : 'jpg';
   const fileName = `${crypto.randomUUID()}.${ext}`;
-  const { error } = await supabase.storage
-    .from('event-images')
-    .upload(fileName, blob, { cacheControl: '31536000', upsert: false, contentType: blob.type || 'image/jpeg' });
-  if (error) throw error;
-  const { data } = supabase.storage.from('event-images').getPublicUrl(fileName);
-  return data.publicUrl;
+  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/event-images/${fileName}`, {
+    method: 'POST',
+    headers: { ...publicHeaders, 'Content-Type': type, 'cache-control': 'max-age=31536000', 'x-upsert': 'false' },
+    body: blob,
+  });
+  if (!res.ok) throw new Error(`Upload failed (${res.status})`);
+  return `${SUPABASE_URL}/storage/v1/object/public/event-images/${fileName}`;
 }
 
 export async function uploadEventImages(files: File[]): Promise<string[]> {
@@ -72,29 +89,28 @@ export async function uploadEventImages(files: File[]): Promise<string[]> {
 export const db = {
   /** Approved events from (roughly) yesterday onwards. */
   getEvents: async (fromDate: string): Promise<AppEvent[]> => {
-    if (!supabase) return [];
-    const { data, error } = await supabase
-      .from('events')
-      .select('*')
-      .eq('status', 'approved')
-      .gte('date', fromDate)
-      .order('date', { ascending: true })
-      .limit(500);
-    if (error) {
-      console.error('Supabase error:', error.message);
-      throw error;
-    }
-    return (data || []).map(mapRow);
+    const url =
+      `${SUPABASE_URL}/rest/v1/events?select=*&status=eq.approved` +
+      `&date=gte.${encodeURIComponent(fromDate)}&order=date.asc&limit=500`;
+    const res = await fetch(url, { headers: publicHeaders });
+    if (!res.ok) throw new Error(`Supabase ${res.status}`);
+    const events = ((await res.json()) || []).map(mapRow);
+    writeCachedEvents(events);
+    return events;
   },
 
+  /**
+   * Keeps the list fresh: re-fetches every 2 minutes while the tab is visible
+   * and immediately when the user comes back to the tab/app.
+   * (Cheaper and lighter than a realtime websocket for a listings site.)
+   */
   subscribeToEvents: (callback: () => void) => {
-    if (!supabase) return null;
-    const channel = supabase
-      .channel('events-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => callback())
-      .subscribe();
+    const tick = () => document.visibilityState === 'visible' && callback();
+    const interval = setInterval(tick, 2 * 60 * 1000);
+    document.addEventListener('visibilitychange', tick);
     return () => {
-      supabase?.removeChannel(channel);
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', tick);
     };
   },
 

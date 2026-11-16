@@ -154,6 +154,7 @@ export const EventDetails: React.FC<Props> = ({ event, saved, onClose, onToggleS
             )}
           </div>
           <h1 className="font-display text-3xl font-bold leading-[1.05] text-white [text-wrap:balance] md:text-5xl">{event.name}</h1>
+          {event.artists && <p className="mt-2 text-lg font-semibold text-night-accent">🎤 {event.artists}</p>}
           <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-1.5 text-white/80 hover:text-white">
             <Icon.Pin /> {event.venue}, {event.city}
           </a>

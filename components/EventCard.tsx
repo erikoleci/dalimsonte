@@ -102,6 +102,7 @@ export const EventCard: React.FC<Props> = ({ event, saved, onOpen, onToggleSave,
         <h3 className="font-display text-[22px] font-bold leading-[1.1] text-white [text-wrap:balance] line-clamp-2">
           {event.name}
         </h3>
+        {event.artists && <p className="mt-1.5 truncate text-[13px] font-semibold text-night-accent">🎤 {event.artists}</p>}
         <div className="mt-2 flex items-center gap-3 text-[13px] text-white/75">
           <span className="flex min-w-0 items-center gap-1">
             <Icon.Pin className="h-3.5 w-3.5 shrink-0" />

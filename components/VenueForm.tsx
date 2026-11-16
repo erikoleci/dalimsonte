@@ -16,6 +16,7 @@ const emptyForm = () => ({
   price: '',
   phone: '',
   instagram: '',
+  artists: '',
   wantsPromotion: false,
   acceptedTerms: false,
 });
@@ -71,6 +72,7 @@ export const VenueForm: React.FC<{ onCancel: () => void }> = ({ onCancel }) => {
         price: form.price.trim(),
         phone: form.phone.trim(),
         instagram: form.instagram.trim() || undefined,
+        artists: form.artists.trim() || undefined,
         gallery,
         wantsPromotion: form.wantsPromotion,
       },
@@ -139,6 +141,10 @@ export const VenueForm: React.FC<{ onCancel: () => void }> = ({ onCancel }) => {
             <input className="field" maxLength={LIMITS.name} value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Saturday Night Fever" required />
           </Field>
         </div>
+
+        <Field label={t('venue.artists')}>
+          <input className="field" maxLength={LIMITS.artists} value={form.artists} onChange={(e) => set('artists', e.target.value)} placeholder={t('venue.artistsPh')} />
+        </Field>
 
         <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
           <Field label={t('venue.city')}>

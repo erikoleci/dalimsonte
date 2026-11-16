@@ -21,7 +21,7 @@ async function fetchApprovedEvents() {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return [];
   try {
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/events?select=id,name,venue,city,date,time,type,price,description,is_promoted&status=eq.approved&order=date.asc`,
+      `${SUPABASE_URL}/rest/v1/events?select=*&status=eq.approved&order=date.asc`,
       { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
     );
     const data = await res.json();
@@ -98,7 +98,7 @@ export default async function handler(req, res) {
       ? events
           .map(
             (e) =>
-              `- [id:${e.id}] "${e.name}" @ ${e.venue}, ${e.city} — ${e.date}${e.time ? ' ' + e.time : ''} — ${e.type} — ${e.price}${
+              `- [id:${e.id}] "${e.name}" @ ${e.venue}, ${e.city} — ${e.date}${e.time ? ' ' + e.time : ''} — ${e.type}${e.artists ? ' — artists: ' + e.artists : ''} — ${e.price}${
                 e.is_promoted ? ' (⭐ Premium/Sponsored)' : ''
               }${e.description ? ' — ' + e.description.slice(0, 140) : ''}`
           )

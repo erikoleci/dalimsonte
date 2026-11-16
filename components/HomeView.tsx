@@ -27,6 +27,21 @@ function readPref(key: string, fallback: string) {
   }
 }
 
+/** Lowercase + strip diacritics, so "kenga e ores", "këngëtar" and "KENGETAR" all match. */
+export function normalize(str: string) {
+  return (str || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9@&\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function searchText(e: AppEvent) {
+  return normalize(`${e.name} ${e.artists || ''} ${e.venue} ${e.city} ${e.instagram || ''} ${e.description}`);
+}
+
 function sortEvents(list: AppEvent[]) {
   return [...list].sort(
     (a, b) =>
@@ -42,7 +57,15 @@ export const HomeView: React.FC<Props> = ({ events, loading, savedIds, onOpen, o
   const [customDate, setCustomDate] = useState('');
   const [city, setCity] = useState(() => readPref('kudalim_city', ALL));
   const [vibe, setVibe] = useState(ALL);
-  const [query, setQuery] = useState('');
+  const [query, setQueryState] = useState(() => new URLSearchParams(window.location.search).get('q') || '');
+  const [heroQuery, setHeroQuery] = useState('');
+  const setQuery = (q: string) => {
+    setQueryState(q);
+    const url = new URL(window.location.href);
+    if (q.trim()) url.searchParams.set('q', q.trim());
+    else url.searchParams.delete('q');
+    window.history.replaceState({}, '', url.toString());
+  };
   const feedRef = useRef<HTMLDivElement>(null);
   const dateInput = useRef<HTMLInputElement>(null);
 
@@ -55,20 +78,27 @@ export const HomeView: React.FC<Props> = ({ events, loading, savedIds, onOpen, o
   const tonight = tonightYMD();
   const tonightCount = events.filter((e) => e.date === tonight).length;
 
+  const searching = normalize(query).length > 0;
+  const indexed = useMemo(() => events.map((e) => [e, searchText(e)] as const), [events]);
+
   const filtered = useMemo(() => {
-    const range = dateRange(dateFilter, customDate);
-    const q = query.trim().toLowerCase();
+    // While searching, look across ALL upcoming dates — people search for an
+    // artist without knowing which night they play.
+    const range = searching ? null : dateRange(dateFilter, customDate);
+    const terms = normalize(query).split(' ').filter(Boolean);
     return sortEvents(
-      events.filter((e) => {
-        if (range && (e.date < range[0] || e.date > range[1])) return false;
-        if (!range && e.date < tonight) return false;
-        if (city !== ALL && e.city !== city) return false;
-        if (vibe !== ALL && e.type !== vibe) return false;
-        if (q && !`${e.name} ${e.venue} ${e.description} ${e.city}`.toLowerCase().includes(q)) return false;
-        return true;
-      })
+      indexed
+        .filter(([e, text]) => {
+          if (range && (e.date < range[0] || e.date > range[1])) return false;
+          if (!range && e.date < tonight) return false;
+          if (city !== ALL && e.city !== city) return false;
+          if (vibe !== ALL && e.type !== vibe) return false;
+          if (terms.length && !terms.every((t) => text.includes(t))) return false;
+          return true;
+        })
+        .map(([e]) => e)
     );
-  }, [events, dateFilter, customDate, city, vibe, query, tonight]);
+  }, [indexed, dateFilter, customDate, city, vibe, query, tonight, searching]);
 
   // When nothing matches, suggest what's coming next (same city first)
   const upcoming = useMemo(() => {
@@ -85,6 +115,10 @@ export const HomeView: React.FC<Props> = ({ events, loading, savedIds, onOpen, o
   }, [filtered]);
 
   const scrollToFeed = () => feedRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  // Opened from a shared search link (?q=...) → jump straight to the results
+  useEffect(() => {
+    if (query) setTimeout(() => feedRef.current?.scrollIntoView({ block: 'start' }), 50);
+  }, []);
 
   const dateChips: { key: DateFilter; label: string }[] = [
     { key: 'tonight', label: t('date.tonight') },
@@ -136,7 +170,28 @@ export const HomeView: React.FC<Props> = ({ events, loading, savedIds, onOpen, o
 
           <p className="mt-6 max-w-xl text-base leading-relaxed text-white/70 animate-fade-in-up [animation-delay:80ms] md:text-lg">{t('hero.sub')}</p>
 
-          <div className="mt-8 flex flex-col gap-3 animate-fade-in-up [animation-delay:140ms] sm:flex-row">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              setQuery(heroQuery);
+              scrollToFeed();
+            }}
+            className="mt-7 flex max-w-xl items-center gap-2 rounded-2xl border border-white/15 bg-white/[0.07] p-1.5 pl-4 backdrop-blur-xl animate-fade-in-up [animation-delay:110ms] focus-within:border-night-accent/60"
+            role="search"
+          >
+            <Icon.Search className="h-5 w-5 shrink-0 text-white/60" />
+            <input
+              value={heroQuery}
+              onChange={(e) => setHeroQuery(e.target.value)}
+              placeholder={t('hero.searchPh')}
+              enterKeyHint="search"
+              className="min-w-0 flex-1 bg-transparent py-2.5 text-base text-white placeholder:text-white/50 outline-none"
+              aria-label={t('hero.searchPh')}
+            />
+            <button className="rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-night-bg transition active:scale-95">{t('hero.search')}</button>
+          </form>
+
+          <div className="mt-4 flex flex-col gap-3 animate-fade-in-up [animation-delay:140ms] sm:flex-row">
             <button onClick={scrollToFeed} className="btn-primary text-lg">
               {t('hero.cta')} <span aria-hidden>↓</span>
             </button>
@@ -154,7 +209,7 @@ export const HomeView: React.FC<Props> = ({ events, loading, savedIds, onOpen, o
           <div className="mx-auto max-w-6xl space-y-2.5 px-5 py-3 md:px-8">
             <div className="no-scrollbar -mx-5 flex gap-2 overflow-x-auto px-5 md:mx-0 md:px-0">
               {dateChips.map((c) => (
-                <button key={c.key} onClick={() => setDateFilter(c.key)} className={`chip ${dateFilter === c.key ? 'chip-active' : ''}`}>
+                <button key={c.key} onClick={() => { setDateFilter(c.key); if (searching) setQuery(''); }} className={`chip ${dateFilter === c.key && !searching ? 'chip-active' : ''}`}>
                   {c.key === 'tonight' && dateFilter !== 'tonight' && <span className="h-1.5 w-1.5 rounded-full bg-night-accent" />}
                   {c.label}
                 </button>
@@ -203,8 +258,15 @@ export const HomeView: React.FC<Props> = ({ events, loading, savedIds, onOpen, o
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder={t('feed.search')}
-                  className="h-full w-full rounded-full border border-night-line bg-white/[0.04] py-2 pl-10 pr-4 text-sm text-white placeholder:text-night-muted/70 outline-none focus:border-night-accent/60"
+                  type="search"
+                  enterKeyHint="search"
+                  className="h-full w-full rounded-full border border-night-line bg-white/[0.04] py-2 pl-10 pr-9 text-sm text-white placeholder:text-night-muted/70 outline-none focus:border-night-accent/60 [&::-webkit-search-cancel-button]:hidden"
                 />
+                {query && (
+                  <button type="button" onClick={() => setQuery('')} aria-label={t('feed.clear')} className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full p-1 text-night-muted hover:text-white">
+                    <Icon.Close className="h-4 w-4" />
+                  </button>
+                )}
               </label>
             </div>
 
@@ -225,7 +287,9 @@ export const HomeView: React.FC<Props> = ({ events, loading, savedIds, onOpen, o
           <div className="mb-6 flex items-end justify-between gap-4">
             <div>
               <h2 className="font-display text-2xl font-bold text-white md:text-3xl">
-                {dateFilter === 'all'
+                {searching
+                  ? `${t('feed.searchTitle')} “${query.trim()}”`
+                  : dateFilter === 'all'
                   ? t('feed.allTitle')
                   : dateFilter === 'custom' && customDate
                     ? `${t('feed.title')} · ${relativeLabel(customDate, lang)}`
@@ -235,6 +299,7 @@ export const HomeView: React.FC<Props> = ({ events, loading, savedIds, onOpen, o
               {!loading && (
                 <p className="mt-1 text-sm text-night-muted">
                   {filtered.length} {filtered.length === 1 ? t('feed.result') : t('feed.results')}
+                  {searching && ` · ${t('feed.searchAllDates').toLowerCase()}`}
                 </p>
               )}
             </div>

@@ -30,9 +30,9 @@ export const Navbar: React.FC<Props> = ({ savedCount, view, onHome, onSaved, onP
       }`}
     >
       <div className="mx-auto flex h-full max-w-6xl items-center justify-between px-4 md:px-8">
-        <button onClick={onHome} className="group flex items-center gap-2.5" aria-label="Ku Dalim Sonte? — home">
-          <img src="/logo.png" alt="" className="h-9 w-9 object-contain transition group-hover:scale-110" />
-          <span className="font-display text-[17px] font-bold tracking-tight text-white">
+        <button onClick={onHome} className="group flex shrink-0 items-center gap-2" aria-label="Ku Dalim Sonte? — home">
+          <img src="/logo.png" alt="" className="h-8 w-8 shrink-0 object-contain transition group-hover:scale-110 sm:h-9 sm:w-9" />
+          <span className="whitespace-nowrap font-display text-[15px] font-bold tracking-tight text-white sm:text-[17px]">
             Ku Dalim <span className="text-night-accent">Sonte?</span>
           </span>
         </button>
@@ -45,7 +45,7 @@ export const Navbar: React.FC<Props> = ({ savedCount, view, onHome, onSaved, onP
           )}
           <button
             onClick={() => setLang(lang === 'sq' ? 'en' : 'sq')}
-            className="flex h-10 items-center rounded-full px-3 text-xs font-bold tracking-wider text-night-muted transition hover:bg-white/[0.07] hover:text-white"
+            className="flex h-10 items-center rounded-full px-2 text-xs sm:px-3 font-bold tracking-wider text-night-muted transition hover:bg-white/[0.07] hover:text-white"
             aria-label={lang === 'sq' ? 'Switch to English' : 'Kalo në shqip'}
           >
             {lang === 'sq' ? 'EN' : 'SQ'}
@@ -63,8 +63,8 @@ export const Navbar: React.FC<Props> = ({ savedCount, view, onHome, onSaved, onP
             )}
           </button>
           {view !== 'venue' && (
-            <button onClick={onPublish} className="ml-1 flex items-center gap-1.5 rounded-full bg-white px-4 py-2.5 text-sm font-bold text-night-bg transition hover:bg-white/90 active:scale-95">
-              <Icon.Plus /> <span>{t('nav.publishShort')}</span>
+            <button onClick={onPublish} aria-label={t('nav.publish')} className="ml-0.5 flex items-center gap-1.5 whitespace-nowrap rounded-full bg-white px-3.5 py-2.5 text-sm font-bold text-night-bg transition hover:bg-white/90 active:scale-95">
+              <Icon.Plus /> <span className="hidden min-[400px]:inline">{t('nav.publishShort')}</span>
             </button>
           )}
         </div>

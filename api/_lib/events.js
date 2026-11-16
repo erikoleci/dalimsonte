@@ -76,6 +76,7 @@ export function validateEventInput(input = {}, { partial = false, trustedImages 
     row.phone = phone;
   }
   if (has('instagram')) row.instagram = normalizeInstagram(input.instagram) || null;
+  if (has('artists')) row.artists = cleanString(input.artists, LIMITS.artists).replace(/\s+/g, ' ') || null;
 
   // Admin may keep legacy base64 images from old submissions, or use any https URL.
   const imageOk = (u) => (trustedImages ? isValidHttpsUrl(u) || /^data:image\/(png|jpe?g|webp);base64,/.test(u) : isOwnStorageUrl(u));
@@ -107,6 +108,7 @@ export function toAppEvent(e) {
     gallery: Array.isArray(e.gallery_urls) ? e.gallery_urls : [],
     phone: e.phone,
     instagram: e.instagram || undefined,
+    artists: e.artists || undefined,
     status: e.status,
     isPromoted: !!e.is_promoted,
     wantsPromotion: !!e.wants_promotion,

@@ -211,7 +211,7 @@ export const AdminPanel: React.FC<{ onExit: () => void; notify: (m: string, t?: 
                   {e.wantsPromotion && !e.isPromoted && <span className="rounded-full border border-night-gold/40 px-2 py-0.5 text-[10px] font-bold uppercase text-night-gold">Kërkon Premium</span>}
                 </div>
                 <div className="mt-1 text-sm text-night-muted">
-                  {e.venue} · {e.city} · {e.date} {e.time || ''} · {e.price}
+                  {e.artists && `🎤 ${e.artists} · `}{e.venue} · {e.city} · {e.date} {e.time || ''} · {e.price}
                 </div>
                 <div className="mt-0.5 font-mono text-xs text-night-muted">
                   📞 {e.phone} {e.instagram && `· @${e.instagram}`} · 👁 {e.views || 0} · 💬 {e.clicks || 0}
@@ -288,6 +288,7 @@ const EditModal: React.FC<{ event: AppEvent; onClose: () => void; onSave: (u: Pa
     <Modal title="✏️ Ndrysho eventin" onClose={onClose}>
       <div className="space-y-3">
         <input className="field" value={e.name} onChange={(x) => set('name', x.target.value)} placeholder="Emri" />
+        <input className="field" value={e.artists || ''} onChange={(x) => set('artists', x.target.value)} placeholder="Këngëtarët / DJ" />
         <div className="grid grid-cols-2 gap-3">
           <input className="field" value={e.venue} onChange={(x) => set('venue', x.target.value)} placeholder="Lokali" />
           <select className="field" value={e.city} onChange={(x) => set('city', x.target.value)}>
@@ -332,6 +333,7 @@ const EditModal: React.FC<{ event: AppEvent; onClose: () => void; onSave: (u: Pa
                 price: e.price,
                 phone: e.phone,
                 instagram: e.instagram,
+                artists: e.artists || '',
                 description: e.description,
                 gallery: e.gallery,
                 image: e.gallery[0] || e.image,

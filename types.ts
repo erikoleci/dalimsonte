@@ -12,6 +12,7 @@ export interface AppEvent {
   gallery?: string[]; // up to 3 photos
   phone: string; // reservations (WhatsApp)
   instagram?: string; // handle without @
+  artists?: string; // line-up: singers / DJs, comma separated
   status: 'pending' | 'approved';
   isPromoted?: boolean; // Premium (approved + paid)
   wantsPromotion?: boolean; // venue asked for Premium when submitting
