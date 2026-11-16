@@ -6,6 +6,7 @@ import { dateRange, isSummerSeason, relativeLabel, tonightYMD } from '../lib/dat
 import { EventCard, EventCardSkeleton, FALLBACK_IMAGE as FALLBACK_IMG } from './EventCard';
 import { Icon, useNow } from './ui';
 import { StoriesBar } from './Stories';
+import { HeroBackground } from './HeroBackground';
 import { normalize, splitArtists } from '../lib/text';
 
 interface Props {
@@ -163,24 +164,8 @@ export const HomeView: React.FC<Props> = ({ events, loading, savedIds, onOpen, o
   return (
     <div>
       {/* ---------------- HERO ---------------- */}
-      <section className="grain relative flex min-h-[78svh] items-end overflow-hidden pb-14 pt-28 md:min-h-[86svh] md:items-center md:pb-0">
-        <div className="pointer-events-none absolute inset-0">
-          <video
-            autoPlay
-            muted
-            loop
-            playsInline
-            preload="metadata"
-            poster="/video/hero-poster.jpg"
-            className="absolute inset-0 h-full w-full scale-105 object-cover opacity-50"
-            aria-hidden="true"
-          >
-            <source src="/video/hero-bg.mp4" type="video/mp4" />
-          </video>
-          <div className="absolute -left-32 top-10 h-[420px] w-[420px] rounded-full bg-night-accent/30 blur-[120px] animate-blob" />
-          <div className="absolute -right-24 bottom-0 h-[380px] w-[380px] rounded-full bg-night-accent2/30 blur-[120px] animate-blob [animation-delay:-6s]" />
-          <div className="absolute inset-0 bg-gradient-to-b from-night-bg/70 via-night-bg/30 to-night-bg" />
-        </div>
+      <section className="relative flex min-h-[78svh] items-end overflow-hidden pb-14 pt-28 md:min-h-[86svh] md:items-center md:pb-0">
+        <HeroBackground events={events} loading={loading} />
 
         <div className="relative z-10 mx-auto w-full max-w-6xl px-5 md:px-8">
           <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-3.5 py-1.5 text-xs font-semibold text-white/85 backdrop-blur animate-fade-in-up">

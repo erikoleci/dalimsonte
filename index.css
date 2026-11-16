@@ -80,6 +80,18 @@
   100% { transform: scale(1); }
 }
 .animate-pop { animation: pop 360ms cubic-bezier(.3,1.6,.5,1); }
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@keyframes beam {
+  0%, 100% { transform: rotate(-12deg); }
+  50% { transform: rotate(12deg); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
 @keyframes storyProgress {
   from { transform: scaleX(0); }
   to { transform: scaleX(1); }
