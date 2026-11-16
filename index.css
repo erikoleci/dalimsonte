@@ -119,6 +119,9 @@
   isolation: isolate; /* keep Leaflet's z-indexes (400+) inside the map */
   z-index: 0;
 }
+.kd-dark-tiles {
+  filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9) saturate(0.6);
+}
 .leaflet-control-attribution {
   background: rgba(7, 6, 13, 0.7) !important;
   color: #8a859c !important;

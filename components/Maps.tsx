@@ -9,10 +9,11 @@ import { useI18n } from '../lib/i18n';
 import { relativeLabel } from '../lib/dates';
 import { FALLBACK_IMAGE } from './EventCard';
 
-// Free dark basemap. CARTO's free tier is generous for a startup; if traffic
-// grows a lot, switch to a MapTiler / Stadia key here.
-const TILE_URL = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-const ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>';
+// OpenStreetMap tiles: free, no API key. Made dark with a CSS filter on the tile
+// layer only (see .kd-dark-tiles in index.css), so pins keep their colours.
+// If traffic grows a lot, switch to a provider with a key (MapTiler, Stadia, Google).
+const TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+const ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 const ALBANIA_CENTER: [number, number] = [41.0, 19.95];
 
 function esc(s: string) {
@@ -26,7 +27,7 @@ function baseMap(el: HTMLElement, opts: L.MapOptions = {}) {
     maxBounds: L.latLngBounds([MAP_BOUNDS.minLat - 0.5, MAP_BOUNDS.minLng - 0.5], [MAP_BOUNDS.maxLat + 0.5, MAP_BOUNDS.maxLng + 0.5]),
     ...opts,
   });
-  L.tileLayer(TILE_URL, { attribution: ATTRIBUTION, subdomains: 'abcd', maxZoom: 19, minZoom: 7 }).addTo(map);
+  L.tileLayer(TILE_URL, { attribution: ATTRIBUTION, maxZoom: 19, minZoom: 7, className: 'kd-dark-tiles' }).addTo(map);
   map.attributionControl.setPrefix(false);
   return map;
 }
@@ -211,21 +212,4 @@ export const LocationPicker: React.FC<PickerProps> = ({ city, lat, lng, onChange
       {geoError && <p className="mt-2 text-sm text-amber-300">{t('map.geoError')}</p>}
     </div>
   );
-};
-
-// ---------------------------------------------------------------------------
-// Small static map on the event page
-// ---------------------------------------------------------------------------
-export const MiniMap: React.FC<{ lat: number; lng: number; image?: string }> = ({ lat, lng, image }) => {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!ref.current) return;
-    const map = baseMap(ref.current, { dragging: false, scrollWheelZoom: false, doubleClickZoom: false, touchZoom: false, boxZoom: false, keyboard: false });
-    map.setView([lat, lng], 16);
-    L.marker([lat, lng], { icon: pinIcon(`<div class="kd-pin"><img src="${esc(image || FALLBACK_IMAGE)}" alt="" /></div>`), interactive: false }).addTo(map);
-    return () => {
-      map.remove();
-    };
-  }, [lat, lng, image]);
-  return <div ref={ref} className="pointer-events-none h-44 w-full" />;
 };

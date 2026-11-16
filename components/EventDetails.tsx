@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { AppEvent } from '../types';
 import { categoryIcon, useI18n } from '../lib/i18n';
 import { buildICS, liveStatus, longDate, relativeLabel } from '../lib/dates';
@@ -6,7 +6,6 @@ import { makeStoryImage, posterColor } from '../lib/visuals';
 import { splitArtists } from '../lib/text';
 import { db } from '../services/supabase';
 import { FALLBACK_IMAGE, priceLabel } from './EventCard';
-const MiniMap = lazy(() => import('./Maps').then((m) => ({ default: m.MiniMap })));
 import { burstConfetti, Icon, LiveBadge, useLockBody, useNow } from './ui';
 
 interface Props {
@@ -253,9 +252,14 @@ export const EventDetails: React.FC<Props> = ({ event, saved, onClose, onToggleS
 
         {hasPin && (
           <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="group mt-8 block overflow-hidden rounded-3xl border border-night-line bg-night-surface">
-            <Suspense fallback={<div className="skeleton h-44" />}>
-              <MiniMap lat={event.lat!} lng={event.lng!} image={event.image} />
-            </Suspense>
+            {/* Google Maps embed — no API key needed */}
+            <iframe
+              title={`${event.venue} — Google Maps`}
+              src={`https://maps.google.com/maps?q=${event.lat},${event.lng}&z=16&hl=${lang}&output=embed`}
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              className="pointer-events-none block h-48 w-full border-0"
+            />
             <div className="flex items-center justify-between gap-3 px-5 py-4">
               <div className="min-w-0">
                 <div className="truncate font-semibold text-white">{event.venue}</div>
