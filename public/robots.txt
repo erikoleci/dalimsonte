@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://dalimsonte-i421.vercel.app/sitemap.xml
+Sitemap: https://dalimsonte.vercel.app/sitemap.xml
