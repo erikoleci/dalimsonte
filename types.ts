@@ -20,6 +20,7 @@ export interface AppEvent {
   isPromoted?: boolean; // Premium (approved + paid)
   wantsPromotion?: boolean; // venue asked for Premium when submitting
   views?: number;
+  going?: number; // "Po shkoj" count
   clicks?: number;
   createdAt?: string;
 }
@@ -28,6 +29,14 @@ export interface AppNotification {
   id: string;
   message: string;
   type: 'success' | 'info' | 'warning';
+}
+
+export interface PollData {
+  poll: { id: string; title: string; createdAt?: string };
+  events: AppEvent[];
+  results: Record<string, { count: number; names: string[] }>;
+  total: number;
+  mine: string | null;
 }
 
 export type DateFilter = 'tonight' | 'tomorrow' | 'weekend' | 'week' | 'all' | 'custom';

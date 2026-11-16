@@ -1,6 +1,7 @@
 {
   "rewrites": [
-    { "source": "/e/:id", "destination": "/api/share?id=:id" }
+    { "source": "/e/:id", "destination": "/api/share?id=:id" },
+    { "source": "/v/:id", "destination": "/api/share?poll=:id" }
   ],
   "headers": [
     {

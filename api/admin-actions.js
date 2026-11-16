@@ -73,6 +73,8 @@ export default async function handler(req, res) {
         // Delete events that ended more than 30 days ago.
         const cutoff = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString().slice(0, 10);
         await sb(`events?date=lt.${cutoff}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+        const pollCutoff = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
+        await sb(`polls?created_at=lt.${encodeURIComponent(pollCutoff)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }).catch(() => {});
         return res.status(200).json({ ok: true });
       }
 

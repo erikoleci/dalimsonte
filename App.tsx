@@ -9,17 +9,21 @@ import { EventCard } from './components/EventCard';
 // Loaded on demand: most visitors never open the form or the admin panel.
 const EventDetails = lazy(() => import('./components/EventDetails').then((m) => ({ default: m.EventDetails })));
 const VenueForm = lazy(() => import('./components/VenueForm').then((m) => ({ default: m.VenueForm })));
+const TogetherBuilder = lazy(() => import('./components/Together').then((m) => ({ default: m.TogetherBuilder })));
+const PollPage = lazy(() => import('./components/Together').then((m) => ({ default: m.PollPage })));
 const CollectionPage = lazy(() => import('./components/CollectionPage').then((m) => ({ default: m.CollectionPage })));
 const AdminPanel = lazy(() => import('./components/AdminPanel').then((m) => ({ default: m.AdminPanel })));
 const EventChatWidget = lazy(() => import('./components/EventChatWidget').then((m) => ({ default: m.EventChatWidget })));
 import { Icon, Toasts } from './components/ui';
 
-type View = 'home' | 'saved' | 'venue' | 'admin' | 'collection';
+type View = 'home' | 'saved' | 'venue' | 'admin' | 'collection' | 'poll';
 type Collection = { kind: 'venue' | 'artist'; name: string } | null;
 
 // Simple hash routing: #/te-ruajturat, #/publiko, #/admin, #/lokali/<emri>, #/artist/<emri>
-function routeFromHash(): { view: View; collection: Collection } {
+function routeFromHash(): { view: View; collection: Collection; pollId?: string } {
   const h = window.location.hash.replace(/^#\/?/, '');
+  const pm = /^bashke\/([A-Za-z0-9_-]{6,16})$/.exec(h);
+  if (pm) return { view: 'poll', collection: null, pollId: pm[1] };
   const m = /^(lokali|artist)\/(.+)$/.exec(h);
   if (m) {
     let name = m[2];
@@ -33,7 +37,7 @@ function routeFromHash(): { view: View; collection: Collection } {
   if (h === 'admin') return { view: 'admin', collection: null };
   return { view: 'home', collection: null };
 }
-const HASH: Record<Exclude<View, 'collection'>, string> = { home: '', saved: '#/te-ruajturat', venue: '#/publiko', admin: '#/admin' };
+const HASH: Record<Exclude<View, 'collection' | 'poll'>, string> = { home: '', saved: '#/te-ruajturat', venue: '#/publiko', admin: '#/admin' };
 
 function loadSet(key: string): Set<string> {
   try {
@@ -53,6 +57,9 @@ function AppInner() {
   const { t } = useI18n();
   const [view, setViewState] = useState<View>(() => routeFromHash().view);
   const [collection, setCollection] = useState<Collection>(() => routeFromHash().collection);
+  const [pollId, setPollId] = useState<string | undefined>(() => routeFromHash().pollId);
+  const [togetherSeed, setTogetherSeed] = useState<AppEvent | null>(null);
+  const [goingIds, setGoingIds] = useState<Set<string>>(() => loadSet('kudalim_going'));
   const [cached] = useState(() => readCachedEvents());
   const [events, setEvents] = useState<AppEvent[]>(() => cached || []);
   const [loading, setLoading] = useState(!cached);
@@ -70,7 +77,7 @@ function AppInner() {
     setTimeout(() => setToasts((prev) => prev.filter((n) => n.id !== id)), 3500);
   }, []);
 
-  const setView = (v: Exclude<View, 'collection'>) => {
+  const setView = (v: Exclude<View, 'collection' | 'poll'>) => {
     setSelected(null);
     setViewState(v);
     setCollection(null);
@@ -86,6 +93,7 @@ function AppInner() {
       const route = routeFromHash();
       setViewState(route.view);
       setCollection(route.collection);
+      setPollId(route.pollId);
       const id = new URLSearchParams(window.location.search).get('event');
       setSelected((cur) => (id ? cur : null));
     };
@@ -158,6 +166,45 @@ function AppInner() {
     url.hash = `#/${kind === 'venue' ? 'lokali' : 'artist'}/${encodeURIComponent(name)}`;
     window.history.pushState({}, '', url.toString());
     window.scrollTo({ top: 0 });
+  };
+
+  const openPoll = (id: string) => {
+    setTogetherSeed(null);
+    setSelected(null);
+    setPollId(id);
+    setViewState('poll');
+    const url = new URL(window.location.href);
+    url.searchParams.delete('event');
+    url.hash = `#/bashke/${id}`;
+    window.history.pushState({}, '', url.toString());
+    window.scrollTo({ top: 0 });
+  };
+
+  const toggleGoing = (e: AppEvent) => {
+    const on = !goingIds.has(e.id);
+    setGoingIds((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(e.id);
+      else next.delete(e.id);
+      saveSet('kudalim_going', next);
+      return next;
+    });
+    const bump = (x: AppEvent) => (x.id === e.id ? { ...x, going: Math.max(0, (x.going || 0) + (on ? 1 : -1)) } : x);
+    setEvents((list) => list.map(bump));
+    setSelected((cur) => (cur ? bump(cur) : cur));
+    db.track(e.id, on ? 'going' : 'ungoing');
+    if (on) {
+      notify(t('going.toast'));
+      // Going implies interest: save it too
+      if (!savedIds.has(e.id)) {
+        setSavedIds((prev) => {
+          const next = new Set(prev);
+          next.add(e.id);
+          saveSet('kudalim_favorites', next);
+          return next;
+        });
+      }
+    }
   };
 
   // ---- Favorites / subscriptions ----
@@ -273,6 +320,7 @@ function AppInner() {
 
         <Suspense fallback={<div className="min-h-[100svh]" />}>
           {view === 'venue' && <VenueForm onCancel={() => setView('home')} />}
+          {view === 'poll' && pollId && <PollPage id={pollId} onOpenEvent={openEvent} onHome={() => setView('home')} notify={notify} />}
           {view === 'collection' && collection && (
             <CollectionPage
               kind={collection.kind}
@@ -292,8 +340,9 @@ function AppInner() {
       {view !== 'admin' && <Footer onPublish={() => setView('venue')} />}
 
       <Suspense fallback={selected ? <div className="fixed inset-0 z-[90] bg-night-bg" /> : null}>
-        {selected && <EventDetails event={selected} saved={savedIds.has(selected.id)} onClose={closeEvent} onToggleSave={toggleSave} notify={notify} onOpenCollection={openCollection} />}
-        {(view === 'home' || view === 'saved' || view === 'collection') && !selected && <EventChatWidget position="right" />}
+        {selected && <EventDetails event={selected} saved={savedIds.has(selected.id)} onClose={closeEvent} onToggleSave={toggleSave} notify={notify} onOpenCollection={openCollection} going={goingIds.has(selected.id)} onToggleGoing={toggleGoing} onGoTogether={(e) => setTogetherSeed(e)} />}
+        {togetherSeed && <TogetherBuilder seed={togetherSeed} events={events} onClose={() => setTogetherSeed(null)} onOpenPoll={openPoll} notify={notify} />}
+        {(view === 'home' || view === 'saved' || view === 'collection') && !selected && !togetherSeed && <EventChatWidget position="right" />}
       </Suspense>
     </div>
   );

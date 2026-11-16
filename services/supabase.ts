@@ -136,7 +136,7 @@ export const db = {
   },
 
   // Analytics: fire-and-forget, rate-limited server-side.
-  track: (id: string, kind: 'view' | 'click') => {
+  track: (id: string, kind: 'view' | 'click' | 'going' | 'ungoing') => {
     try {
       fetch('/api/track', {
         method: 'POST',
@@ -146,6 +146,36 @@ export const db = {
       }).catch(() => {});
     } catch {}
   },
+};
+
+// ---------------------------------------------------------------------------
+// "Shkojmë bashkë" group votes
+// ---------------------------------------------------------------------------
+function voterToken() {
+  try {
+    let t = localStorage.getItem('kudalim_voter');
+    if (!t) {
+      t = crypto.randomUUID();
+      localStorage.setItem('kudalim_voter', t);
+    }
+    return t;
+  } catch {
+    return crypto.randomUUID();
+  }
+}
+
+async function pollApi<T>(body: any): Promise<T> {
+  const res = await fetch('/api/poll', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || 'Gabim');
+  return data as T;
+}
+
+export const polls = {
+  create: (eventIds: string[], title?: string) => pollApi<{ id: string }>({ action: 'create', eventIds, title }),
+  get: (id: string) => pollApi<import('../types').PollData>({ action: 'get', id, voterToken: voterToken() }),
+  vote: (id: string, eventId: string, name?: string) =>
+    pollApi<import('../types').PollData>({ action: 'vote', id, eventId, name, voterToken: voterToken() }),
 };
 
 // ---------------------------------------------------------------------------

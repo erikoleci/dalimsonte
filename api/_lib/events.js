@@ -132,6 +132,7 @@ export function toAppEvent(e) {
     isPromoted: !!e.is_promoted,
     wantsPromotion: !!e.wants_promotion,
     views: e.views || 0,
+    going: e.going || 0,
     clicks: e.clicks || 0,
     createdAt: e.created_at,
   };

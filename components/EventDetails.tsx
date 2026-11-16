@@ -15,7 +15,12 @@ interface Props {
   onToggleSave: (e: AppEvent) => void;
   notify: (msg: string, type?: 'success' | 'info' | 'warning') => void;
   onOpenCollection: (kind: 'venue' | 'artist', name: string) => void;
+  going: boolean;
+  onToggleGoing: (e: AppEvent) => void;
+  onGoTogether: (e: AppEvent) => void;
 }
+
+const AVATAR_COLORS = ['#ff3d7f', '#7c5cff', '#ffc94d', '#3ee08f', '#ff8a5b'];
 
 export function shareUrlFor(event: AppEvent) {
   return `${window.location.origin}/e/${encodeURIComponent(event.id)}`;
@@ -29,7 +34,7 @@ function whatsappNumber(phone: string) {
   return d;
 }
 
-export const EventDetails: React.FC<Props> = ({ event, saved, onClose, onToggleSave, notify, onOpenCollection }) => {
+export const EventDetails: React.FC<Props> = ({ event, saved, onClose, onToggleSave, notify, onOpenCollection, going, onToggleGoing, onGoTogether }) => {
   const { t, cat, lang } = useI18n();
   const photos = event.gallery && event.gallery.length > 0 ? event.gallery : [event.image || FALLBACK_IMAGE];
   const [idx, setIdx] = useState(0);
@@ -223,6 +228,49 @@ export const EventDetails: React.FC<Props> = ({ event, saved, onClose, onToggleS
           <InfoTile label={t('details.date')} value={longDate(event.date, lang)} />
           <InfoTile label={t('details.time')} value={event.time || t('details.timeDefault')} />
           <InfoTile label={t('details.price')} value={priceLabel(event.price, t('card.free'))} accent />
+        </div>
+
+        {/* Po shkoj + Shkojmë bashkë */}
+        <div className="mt-4 rounded-3xl border border-night-line bg-night-surface p-4">
+          <div className="mb-3 flex items-center gap-3">
+            <div className="flex -space-x-2">
+              {Array.from({ length: Math.min(4, Math.max(1, event.going || 0)) }).map((_, i) => (
+                <span key={i} className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-night-surface text-xs" style={{ background: AVATAR_COLORS[i % 5] }}>
+                  {['🙋', '💃', '🕺', '🥳'][i]}
+                </span>
+              ))}
+            </div>
+            <p className="text-sm text-white/80">
+              {(event.going || 0) > 0 ? (
+                <>
+                  <span className="font-bold text-white">{event.going}</span> {(event.going || 0) === 1 ? t('going.count1') : t('going.count')}
+                </>
+              ) : (
+                t('going.first')
+              )}
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-2.5">
+            <button
+              key={going ? 'on' : 'off'}
+              onClick={(ev) => {
+                if (!going) burstConfetti(ev.clientX, ev.clientY);
+                onToggleGoing(event);
+              }}
+              aria-pressed={going}
+              className={`flex h-12 items-center justify-center gap-1.5 whitespace-nowrap rounded-2xl px-2 text-[15px] font-bold transition active:scale-[0.97] ${
+                going ? 'animate-pop bg-night-live text-black' : 'bg-white text-night-bg hover:bg-white/90'
+              }`}
+            >
+              🙋 {going ? t('going.on') : t('going.btn')}
+            </button>
+            <button
+              onClick={() => onGoTogether(event)}
+              className="flex h-12 items-center justify-center gap-1.5 whitespace-nowrap rounded-2xl border border-night-line bg-white/[0.05] px-2 text-[15px] font-bold text-white transition hover:bg-white/10 active:scale-[0.97]"
+            >
+              👯 {t('together.btn')}
+            </button>
+          </div>
         </div>
 
         <div className="mt-4 grid grid-cols-3 gap-2.5">

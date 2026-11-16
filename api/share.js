@@ -24,7 +24,48 @@ function prettyDate(d) {
   return m ? `${Number(m[3])} ${MONTHS[Number(m[2]) - 1]}` : '';
 }
 
+const POLL_RE = /^[A-Za-z0-9_-]{6,16}$/;
+
+// /v/<pollId> — "Shkojmë bashkë" vote links
+async function pollPreview(req, res) {
+  const pollId = String(req.query?.poll || '');
+  const origin = `https://${req.headers['x-forwarded-host'] || req.headers.host}`;
+  const appUrl = POLL_RE.test(pollId) ? `${origin}/#/bashke/${pollId}` : `${origin}/`;
+  let names = [];
+  let image = `${origin}/icon-512.png`;
+  let title = '🗳️ Ku dalim sonte? Voto!';
+  if (POLL_RE.test(pollId)) {
+    try {
+      const rows = await sb(`polls?select=title,event_ids&id=eq.${encodeURIComponent(pollId)}&limit=1`);
+      const poll = Array.isArray(rows) ? rows[0] : null;
+      const ids = (poll?.event_ids || []).filter((x) => ID_RE.test(x));
+      if (poll?.title) title = `🗳️ ${poll.title}`;
+      if (ids.length) {
+        const evs = await sb(`events?select=id,name,venue,image&id=in.(${ids.join(',')})`);
+        const ordered = ids.map((x) => (evs || []).find((e) => e.id === x)).filter(Boolean);
+        names = ordered.map((e) => `${e.name} (${e.venue})`);
+        const withImg = ordered.find((e) => /^https:\/\//.test(e.image || ''));
+        if (withImg) image = withImg.image;
+      }
+    } catch {
+      /* generic preview */
+    }
+  }
+  const desc = names.length ? `Zgjidh: ${names.join(' · ')}` : 'Voto ku do të dalim sonte!';
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Cache-Control', 'public, s-maxage=120, stale-while-revalidate=600');
+  res.status(200).send(`<!doctype html><html lang="sq"><head><meta charset="utf-8">
+<title>${esc(title)}</title>
+<meta property="og:type" content="website"><meta property="og:site_name" content="Ku Dalim Sonte?">
+<meta property="og:title" content="${esc(title)}"><meta property="og:description" content="${esc(desc)}">
+<meta property="og:image" content="${esc(image)}"><meta property="og:url" content="${esc(appUrl)}">
+<meta name="twitter:card" content="summary_large_image">
+<meta http-equiv="refresh" content="0; url=${esc(appUrl)}"></head>
+<body style="background:#07060d;color:#fff;font-family:sans-serif"><a href="${esc(appUrl)}" style="color:#ff3d7f">Voto →</a></body></html>`);
+}
+
 export default async function handler(req, res) {
+  if (req.query?.poll) return pollPreview(req, res);
   const id = String(req.query?.id || '');
   const origin = `https://${req.headers['x-forwarded-host'] || req.headers.host}`;
   const appUrl = ID_RE.test(id) ? `${origin}/?event=${encodeURIComponent(id)}` : `${origin}/`;

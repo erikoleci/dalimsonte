@@ -12,16 +12,24 @@ export default async function handler(req, res) {
 
   try {
     const { id, kind } = req.body || {};
-    if (!ID_RE.test(String(id || '')) || !['view', 'click'].includes(kind)) {
+    if (!ID_RE.test(String(id || '')) || !['view', 'click', 'going', 'ungoing'].includes(kind)) {
       return res.status(400).json({ error: 'Bad request' });
     }
-    // Count each IP at most once per event per kind every 30 minutes.
-    const { allowed } = await rateLimit(`track:${kind}:${id}:${getClientIp(req)}`, { windowMs: 30 * 60 * 1000, max: 1 });
+    // Views/clicks: each IP counts once per event every 30 min.
+    // "Po shkoj": each IP can add/remove at most 3 times per event per 12h.
+    const isGoing = kind === 'going' || kind === 'ungoing';
+    const { allowed } = await rateLimit(`track:${kind}:${id}:${getClientIp(req)}`, {
+      windowMs: isGoing ? 12 * 3600 * 1000 : 30 * 60 * 1000,
+      max: isGoing ? 3 : 1,
+    });
+    const fn = {
+      view: 'increment_event_views',
+      click: 'increment_event_clicks',
+      going: 'increment_event_going',
+      ungoing: 'decrement_event_going',
+    }[kind];
     if (allowed) {
-      await sb(`rpc/${kind === 'view' ? 'increment_event_views' : 'increment_event_clicks'}`, {
-        method: 'POST',
-        body: JSON.stringify({ event_id: id }),
-      });
+      await sb(`rpc/${fn}`, { method: 'POST', body: JSON.stringify({ event_id: id }) });
     }
     return res.status(204).end();
   } catch (err) {

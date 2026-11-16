@@ -107,6 +107,50 @@ revoke execute on function increment_event_clicks(text) from public, anon, authe
 grant execute on function increment_event_views(text) to service_role;
 grant execute on function increment_event_clicks(text) to service_role;
 
+-- "Po shkoj" counter (called only by /api/track with service_role)
+alter table events add column if not exists going integer default 0;
+
+create or replace function increment_event_going(event_id text)
+returns void as $$
+begin
+  update events set going = coalesce(going, 0) + 1 where id = event_id and status = 'approved';
+end;
+$$ language plpgsql security definer set search_path = public;
+
+create or replace function decrement_event_going(event_id text)
+returns void as $$
+begin
+  update events set going = greatest(coalesce(going, 0) - 1, 0) where id = event_id;
+end;
+$$ language plpgsql security definer set search_path = public;
+
+revoke execute on function increment_event_going(text) from public, anon, authenticated;
+revoke execute on function decrement_event_going(text) from public, anon, authenticated;
+grant execute on function increment_event_going(text) to service_role;
+grant execute on function decrement_event_going(text) to service_role;
+
+-- ---------------------------------------------------------------------
+-- 2b. "SHKOJMË BASHKË" — group votes (server-only, via /api/poll)
+-- ---------------------------------------------------------------------
+create table if not exists polls (
+  id text primary key,
+  title text,
+  event_ids text[] not null,
+  created_at timestamp with time zone default now()
+);
+alter table polls enable row level security;
+
+create table if not exists poll_votes (
+  poll_id text not null references polls(id) on delete cascade,
+  voter text not null,          -- hash of a random per-browser token, not personal data
+  event_id text not null,
+  name text,                    -- optional first name typed by the voter
+  created_at timestamp with time zone default now(),
+  primary key (poll_id, voter)
+);
+alter table poll_votes enable row level security;
+-- (no public policies: only the server reads/writes polls)
+
 -- ---------------------------------------------------------------------
 -- 3. APP SETTINGS (admin password hash) — server-only, zero public access
 -- ---------------------------------------------------------------------

@@ -8,6 +8,7 @@ import { Icon, useNow } from './ui';
 import { StoriesBar } from './Stories';
 import { HeroBackground } from './HeroBackground';
 
+const SurpriseModal = lazy(() => import('./Surprise').then((m) => ({ default: m.SurpriseModal })));
 const EventsMap = lazy(() => import('./Maps').then((m) => ({ default: m.EventsMap })));
 import { normalize, splitArtists } from '../lib/text';
 
@@ -62,6 +63,7 @@ export const HomeView: React.FC<Props> = ({ events, loading, savedIds, onOpen, o
   const [query, setQueryState] = useState(() => new URLSearchParams(window.location.search).get('q') || '');
   const [heroQuery, setHeroQuery] = useState('');
   const [mode, setMode] = useState<'list' | 'map'>('list');
+  const [surprise, setSurprise] = useState(false);
   const setQuery = (q: string) => {
     setQueryState(q);
     const url = new URL(window.location.href);
@@ -224,6 +226,23 @@ export const HomeView: React.FC<Props> = ({ events, loading, savedIds, onOpen, o
         </div>
       </section>
 
+      {surprise && (
+        <Suspense fallback={null}>
+          <SurpriseModal
+            pool={
+              filtered.length
+                ? filtered
+                : sortEvents(events.filter((e) => e.date >= tonight && (city === ALL || e.city === city))).slice(0, 40)
+            }
+            onClose={() => setSurprise(false)}
+            onOpen={(e) => {
+              setSurprise(false);
+              onOpen(e);
+            }}
+          />
+        </Suspense>
+      )}
+
       {/* ---------------- STORIES ---------------- */}
       {!loading && (
         <StoriesBar
@@ -245,6 +264,9 @@ export const HomeView: React.FC<Props> = ({ events, loading, savedIds, onOpen, o
                   {c.label}
                 </button>
               ))}
+              <button onClick={() => setSurprise(true)} className="chip border-night-accent/40 bg-gradient-to-r from-night-accent/20 to-night-accent2/20 text-white">
+                🎲 {t('surprise.btn')}
+              </button>
               <button
                 onClick={() => (dateInput.current as any)?.showPicker?.() ?? dateInput.current?.click()}
                 className={`chip relative ${dateFilter === 'custom' ? 'chip-active' : ''}`}

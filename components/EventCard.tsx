@@ -29,6 +29,7 @@ export const EventCard: React.FC<Props> = ({ event, saved, onOpen, onToggleSave,
   const p = dateParts(event.date, lang);
   const status = liveStatus(event.date, event.time, lang);
   const hot = (event.views || 0) >= 15;
+  const going = event.going || 0;
 
   return (
     <article
@@ -94,10 +95,15 @@ export const EventCard: React.FC<Props> = ({ event, saved, onOpen, onToggleSave,
 
       {/* Bottom content */}
       <div className="absolute inset-x-0 bottom-0 p-5">
-        {(status || hot) && (
+        {(status || hot || going >= 3) && (
           <div className="mb-2 flex flex-wrap gap-1.5">
             <LiveBadge status={status} />
-            {hot && (
+            {going >= 3 && (
+              <span className="rounded-full bg-night-accent/90 px-2.5 py-1 text-[11px] font-bold text-white backdrop-blur-md">
+                🙋 {going} {t('going.count')}
+              </span>
+            )}
+            {hot && going < 3 && (
               <span className="rounded-full bg-black/50 px-2.5 py-1 text-[11px] font-bold text-white backdrop-blur-md">
                 🔥 {event.views} {t('trending.views')}
               </span>
