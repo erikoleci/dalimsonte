@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import type { AppEvent, DateFilter } from '../types';
 import { CATEGORIES, CITIES } from '../shared/constants.js';
 import { useI18n } from '../lib/i18n';
@@ -7,6 +7,8 @@ import { EventCard, EventCardSkeleton, FALLBACK_IMAGE as FALLBACK_IMG } from './
 import { Icon, useNow } from './ui';
 import { StoriesBar } from './Stories';
 import { HeroBackground } from './HeroBackground';
+
+const EventsMap = lazy(() => import('./Maps').then((m) => ({ default: m.EventsMap })));
 import { normalize, splitArtists } from '../lib/text';
 
 interface Props {
@@ -59,6 +61,7 @@ export const HomeView: React.FC<Props> = ({ events, loading, savedIds, onOpen, o
   const [vibe, setVibe] = useState(ALL);
   const [query, setQueryState] = useState(() => new URLSearchParams(window.location.search).get('q') || '');
   const [heroQuery, setHeroQuery] = useState('');
+  const [mode, setMode] = useState<'list' | 'map'>('list');
   const setQuery = (q: string) => {
     setQueryState(q);
     const url = new URL(window.location.href);
@@ -312,7 +315,7 @@ export const HomeView: React.FC<Props> = ({ events, loading, savedIds, onOpen, o
         </div>
 
         <div className="mx-auto min-h-[60vh] max-w-6xl px-5 pb-24 pt-8 md:px-8">
-          <div className="mb-6 flex items-end justify-between gap-4">
+          <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
             <div>
               <h2 className="font-display text-2xl font-bold text-white md:text-3xl">
                 {searching
@@ -331,6 +334,20 @@ export const HomeView: React.FC<Props> = ({ events, loading, savedIds, onOpen, o
                 </p>
               )}
             </div>
+            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex rounded-full border border-night-line bg-white/[0.04] p-1" role="tablist">
+              {(['list', 'map'] as const).map((m) => (
+                <button
+                  key={m}
+                  role="tab"
+                  aria-selected={mode === m}
+                  onClick={() => setMode(m)}
+                  className={`rounded-full px-3.5 py-1.5 text-sm font-semibold transition ${mode === m ? 'bg-white text-night-bg' : 'text-night-muted hover:text-white'}`}
+                >
+                  {m === 'list' ? `☰ ${t('map.list')}` : `🗺 ${t('map.map')}`}
+                </button>
+              ))}
+            </div>
             {city !== ALL && (
               <button
                 onClick={() => onToggleSubscription(city)}
@@ -339,6 +356,7 @@ export const HomeView: React.FC<Props> = ({ events, loading, savedIds, onOpen, o
                 <Icon.Bell /> <span className="hidden sm:inline">{subscribed ? t('feed.notifyOn') : t('feed.notify')}</span>
               </button>
             )}
+            </div>
           </div>
 
           {searching && (suggestions.artists.length > 0 || suggestions.venues.length > 0) && (
@@ -356,7 +374,22 @@ export const HomeView: React.FC<Props> = ({ events, loading, savedIds, onOpen, o
             </div>
           )}
 
-          {loading ? (
+          {mode === 'map' && !loading ? (
+            <div className="animate-fade-in-up">
+              {filtered.some((e) => typeof e.lat === 'number') ? (
+                <Suspense fallback={<div className="skeleton h-[65vh] min-h-[420px] rounded-[28px]" />}>
+                  <EventsMap events={filtered} onOpen={onOpen} />
+                </Suspense>
+              ) : (
+                <div className="rounded-[28px] border border-dashed border-night-line px-6 py-16 text-center text-night-muted">🗺 {t('map.none')}</div>
+              )}
+              {filtered.some((e) => typeof e.lat !== 'number') && filtered.some((e) => typeof e.lat === 'number') && (
+                <p className="mt-3 text-center text-xs text-night-muted">
+                  {filtered.filter((e) => typeof e.lat !== 'number').length} {t('map.withoutPin')}
+                </p>
+              )}
+            </div>
+          ) : loading ? (
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {Array.from({ length: 6 }).map((_, i) => (
                 <EventCardSkeleton key={i} />

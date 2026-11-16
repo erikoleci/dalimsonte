@@ -1,5 +1,5 @@
 // Validation + mapping for event rows. Server-side only.
-import { CITIES, CATEGORY_VALUES, LIMITS } from '../../shared/constants.js';
+import { CITIES, CATEGORY_VALUES, LIMITS, MAP_BOUNDS } from '../../shared/constants.js';
 import { cleanString, isValidHttpsUrl, supabaseUrl } from './security.js';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -76,6 +76,22 @@ export function validateEventInput(input = {}, { partial = false, trustedImages 
     row.phone = phone;
   }
   if (has('instagram')) row.instagram = normalizeInstagram(input.instagram) || null;
+  if (has('lat') || has('lng')) {
+    const lat = input.lat === null || input.lat === '' || input.lat === undefined ? null : Number(input.lat);
+    const lng = input.lng === null || input.lng === '' || input.lng === undefined ? null : Number(input.lng);
+    if (lat === null || lng === null) {
+      row.lat = null;
+      row.lng = null;
+    } else {
+      const b = MAP_BOUNDS;
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < b.minLat || lat > b.maxLat || lng < b.minLng || lng > b.maxLng) {
+        return { error: 'Vendndodhja duhet të jetë në Shqipëri' };
+      }
+      row.lat = Math.round(lat * 1e6) / 1e6;
+      row.lng = Math.round(lng * 1e6) / 1e6;
+    }
+  }
+  if (has('address')) row.address = cleanString(input.address, LIMITS.address) || null;
   if (has('artists')) row.artists = cleanString(input.artists, LIMITS.artists).replace(/\s+/g, ' ') || null;
 
   // Admin may keep legacy base64 images from old submissions, or use any https URL.
@@ -109,6 +125,9 @@ export function toAppEvent(e) {
     phone: e.phone,
     instagram: e.instagram || undefined,
     artists: e.artists || undefined,
+    lat: typeof e.lat === 'number' ? e.lat : undefined,
+    lng: typeof e.lng === 'number' ? e.lng : undefined,
+    address: e.address || undefined,
     status: e.status,
     isPromoted: !!e.is_promoted,
     wantsPromotion: !!e.wants_promotion,

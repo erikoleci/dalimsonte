@@ -1,11 +1,13 @@
 // Admin panel — Albanian only (internal tool).
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import type { AppEvent } from '../types';
 import { CATEGORIES, CITIES } from '../shared/constants.js';
 import { admin, AdminAuthError, SUPABASE_PROJECT_REF } from '../services/supabase';
 import { tonightYMD } from '../lib/dates';
 import { FALLBACK_IMAGE } from './EventCard';
 import { Icon } from './ui';
+
+const LocationPicker = lazy(() => import('./Maps').then((m) => ({ default: m.LocationPicker })));
 
 type Tab = 'pending' | 'live' | 'past' | 'all';
 
@@ -214,7 +216,7 @@ export const AdminPanel: React.FC<{ onExit: () => void; notify: (m: string, t?: 
                   {e.artists && `🎤 ${e.artists} · `}{e.venue} · {e.city} · {e.date} {e.time || ''} · {e.price}
                 </div>
                 <div className="mt-0.5 font-mono text-xs text-night-muted">
-                  📞 {e.phone} {e.instagram && `· @${e.instagram}`} · 👁 {e.views || 0} · 💬 {e.clicks || 0}
+                  📞 {e.phone} {e.instagram && `· @${e.instagram}`} {typeof e.lat === 'number' ? '· 📍' : '· pa hartë'} · 👁 {e.views || 0} · 💬 {e.clicks || 0}
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -317,6 +319,13 @@ const EditModal: React.FC<{ event: AppEvent; onClose: () => void; onSave: (u: Pa
         </div>
         <input className="field" value={e.gallery[0] || ''} onChange={(x) => set('gallery', [x.target.value, ...e.gallery.slice(1)].filter(Boolean))} placeholder="URL e fotos kryesore (https://…)" />
         <textarea rows={4} className="field" value={e.description} onChange={(x) => set('description', x.target.value)} placeholder="Përshkrimi" />
+        <div>
+          <span className="label">📍 Vendndodhja</span>
+          <Suspense fallback={<div className="skeleton h-64 rounded-2xl" />}>
+            <LocationPicker city={e.city} lat={e.lat} lng={e.lng} onChange={(lat, lng) => setE((x) => ({ ...x, lat, lng }))} />
+          </Suspense>
+          <input className="field mt-2" value={e.address || ''} onChange={(x) => set('address', x.target.value)} placeholder="Shënim adrese (p.sh. Blloku, pranë Piramidës)" />
+        </div>
         <div className="flex gap-2 pt-2">
           <button onClick={onClose} className="btn-ghost flex-1 !py-3">Anulo</button>
           <button
@@ -334,6 +343,9 @@ const EditModal: React.FC<{ event: AppEvent; onClose: () => void; onSave: (u: Pa
                 phone: e.phone,
                 instagram: e.instagram,
                 artists: e.artists || '',
+                lat: e.lat ?? (null as any),
+                lng: e.lng ?? (null as any),
+                address: e.address || '',
                 description: e.description,
                 gallery: e.gallery,
                 image: e.gallery[0] || e.image,

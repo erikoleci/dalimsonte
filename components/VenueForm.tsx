@@ -1,9 +1,11 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { ADMIN_CONTACT, CATEGORIES, CITIES, LIMITS } from '../shared/constants.js';
 import { useI18n } from '../lib/i18n';
 import { tonightYMD } from '../lib/dates';
 import { db, uploadEventImages } from '../services/supabase';
 import { Icon, Turnstile } from './ui';
+
+const LocationPicker = lazy(() => import('./Maps').then((m) => ({ default: m.LocationPicker })));
 
 const emptyForm = () => ({
   venue: '',
@@ -17,6 +19,9 @@ const emptyForm = () => ({
   phone: '',
   instagram: '',
   artists: '',
+  lat: undefined as number | undefined,
+  lng: undefined as number | undefined,
+  address: '',
   wantsPromotion: false,
   acceptedTerms: false,
 });
@@ -73,6 +78,9 @@ export const VenueForm: React.FC<{ onCancel: () => void }> = ({ onCancel }) => {
         phone: form.phone.trim(),
         instagram: form.instagram.trim() || undefined,
         artists: form.artists.trim() || undefined,
+        lat: form.lat,
+        lng: form.lng,
+        address: form.address.trim() || undefined,
         gallery,
         wantsPromotion: form.wantsPromotion,
       },
@@ -163,6 +171,13 @@ export const VenueForm: React.FC<{ onCancel: () => void }> = ({ onCancel }) => {
             <input type="time" className="field" value={form.time} onChange={(e) => set('time', e.target.value)} />
           </Field>
         </div>
+
+        <Field label={`📍 ${t('map.pickTitle')}`}>
+          <Suspense fallback={<div className="skeleton h-64 rounded-2xl md:h-72" />}>
+            <LocationPicker city={form.city} lat={form.lat} lng={form.lng} onChange={(lat, lng) => setForm((f) => ({ ...f, lat, lng }))} />
+          </Suspense>
+          <input className="field mt-3" maxLength={LIMITS.address} value={form.address} onChange={(e) => set('address', e.target.value)} placeholder={t('map.addressPh')} aria-label={t('map.address')} />
+        </Field>
 
         <Field label={t('venue.type')}>
           <div className="flex flex-wrap gap-2">

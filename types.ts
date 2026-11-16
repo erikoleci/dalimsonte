@@ -13,6 +13,9 @@ export interface AppEvent {
   phone: string; // reservations (WhatsApp)
   instagram?: string; // handle without @
   artists?: string; // line-up: singers / DJs, comma separated
+  lat?: number; // venue pin
+  lng?: number;
+  address?: string; // short hint, e.g. "Blloku, pranë Piramidës"
   status: 'pending' | 'approved';
   isPromoted?: boolean; // Premium (approved + paid)
   wantsPromotion?: boolean; // venue asked for Premium when submitting

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import type { AppEvent } from '../types';
 import { categoryIcon, useI18n } from '../lib/i18n';
 import { buildICS, liveStatus, longDate, relativeLabel } from '../lib/dates';
@@ -6,6 +6,7 @@ import { makeStoryImage, posterColor } from '../lib/visuals';
 import { splitArtists } from '../lib/text';
 import { db } from '../services/supabase';
 import { FALLBACK_IMAGE, priceLabel } from './EventCard';
+const MiniMap = lazy(() => import('./Maps').then((m) => ({ default: m.MiniMap })));
 import { burstConfetti, Icon, LiveBadge, useLockBody, useNow } from './ui';
 
 interface Props {
@@ -87,7 +88,10 @@ export const EventDetails: React.FC<Props> = ({ event, saved, onClose, onToggleS
   const reserveText = t('details.reserveMsg', { name: event.name, date: longDate(event.date, lang) });
   const waNumber = whatsappNumber(event.phone);
   const waUrl = `https://wa.me/${waNumber}?text=${encodeURIComponent(reserveText)}`;
-  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${event.venue}, ${event.city}, Albania`)}`;
+  const hasPin = typeof event.lat === 'number' && typeof event.lng === 'number';
+  const mapsUrl = hasPin
+    ? `https://www.google.com/maps/dir/?api=1&destination=${event.lat},${event.lng}`
+    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${event.venue}, ${event.city}, Albania`)}`;
 
   const share = async () => {
     const text = `${event.name} @ ${event.venue}, ${event.city} — ${relativeLabel(event.date, lang)}`;
@@ -119,7 +123,7 @@ export const EventDetails: React.FC<Props> = ({ event, saved, onClose, onToggleS
 
   return (
     <div
-      className="fixed inset-0 z-[90] overflow-y-auto bg-night-bg animate-scale-in"
+      className="fixed inset-0 z-[90] overflow-y-auto bg-night-bg animate-[fadeIn_0.25s_ease-out_both]"
       role="dialog"
       aria-modal="true"
       aria-label={event.name}
@@ -246,6 +250,21 @@ export const EventDetails: React.FC<Props> = ({ event, saved, onClose, onToggleS
           <h2 className="label">{t('details.about')}</h2>
           <p className="whitespace-pre-wrap text-[17px] leading-relaxed text-white/85">{event.description}</p>
         </section>
+
+        {hasPin && (
+          <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="group mt-8 block overflow-hidden rounded-3xl border border-night-line bg-night-surface">
+            <Suspense fallback={<div className="skeleton h-44" />}>
+              <MiniMap lat={event.lat!} lng={event.lng!} image={event.image} />
+            </Suspense>
+            <div className="flex items-center justify-between gap-3 px-5 py-4">
+              <div className="min-w-0">
+                <div className="truncate font-semibold text-white">{event.venue}</div>
+                <div className="truncate text-sm text-night-muted">{event.address || event.city}</div>
+              </div>
+              <span className="shrink-0 rounded-full bg-white px-4 py-2 text-sm font-bold text-night-bg transition group-hover:bg-white/90">{t('map.directions')} ↗</span>
+            </div>
+          </a>
+        )}
 
         <section className="mt-8 flex flex-col gap-2.5 rounded-3xl border border-night-line bg-night-surface p-5">
           <div className="flex items-center justify-between">

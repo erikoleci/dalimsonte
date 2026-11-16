@@ -20,6 +20,9 @@ function mapRow(e: any): AppEvent {
     time: e.time || undefined,
     instagram: e.instagram || undefined,
     artists: e.artists || undefined,
+    lat: typeof e.lat === 'number' ? e.lat : undefined,
+    lng: typeof e.lng === 'number' ? e.lng : undefined,
+    address: e.address || undefined,
     isPromoted: !!e.is_promoted,
     gallery: Array.isArray(e.gallery_urls) ? e.gallery_urls : [],
   };

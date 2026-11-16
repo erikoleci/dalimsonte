@@ -36,6 +36,9 @@ alter table events add column if not exists clicks integer default 0;
 alter table events add column if not exists time text;              -- "22:00"
 alter table events add column if not exists instagram text;         -- handle without @
 alter table events add column if not exists artists text;           -- line-up: singers / DJs
+alter table events add column if not exists lat double precision;   -- venue pin on the map
+alter table events add column if not exists lng double precision;
+alter table events add column if not exists address text;           -- short hint, e.g. "Blloku, pranë Piramidës"
 alter table events add column if not exists wants_promotion boolean default false; -- venue asked for Premium
 
 create index if not exists events_status_date_idx on events (status, date);
