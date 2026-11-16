@@ -1,90 +1,100 @@
-// ============ ADMIN ACTIONS (approve / edit / delete event, change password) ============
-// All writes that used to happen client-side with the anon key now happen here,
-// server-side, with the service_role key — and only after verifying the admin token.
-// The anon key can no longer write to `events` beyond a fresh pending submission,
-// and can no longer touch `app_settings` at all (see supabase-schema-secure.sql).
+// ============ ADMIN ACTIONS ============
+// Every moderation write goes through here, with the service_role key, and only
+// after verifying the admin session token. The browser's public key can only
+// read approved events.
 
-import { enforceRateLimit, requireAdmin, supabaseServiceHeaders, supabaseUrl } from './_lib/security.js';
+import {
+  enforceRateLimit,
+  getStoredPassword,
+  hashPassword,
+  requireAdmin,
+  requirePost,
+  sb,
+  sbWriteTolerant,
+  setStoredPassword,
+  verifyPassword,
+} from './_lib/security.js';
+import { toAppEvent, validateEventInput } from './_lib/events.js';
 
-async function sb(path, options = {}) {
-  const res = await fetch(`${supabaseUrl()}/rest/v1/${path}`, {
-    ...options,
-    headers: { ...supabaseServiceHeaders(), ...(options.headers || {}) },
-  });
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`Supabase ${res.status}: ${text}`);
-  }
-  return res.status === 204 ? null : res.json();
-}
+const ID_RE = /^[A-Za-z0-9-]{1,64}$/;
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    res.status(405).json({ error: 'Method not allowed' });
-    return;
-  }
-  if (!enforceRateLimit(req, res, { windowMs: 60 * 1000, max: 30, bucket: 'admin-actions' })) return;
-  if (!requireAdmin(req, res)) return;
+  if (!requirePost(req, res)) return;
+  if (!(await enforceRateLimit(req, res, { windowMs: 60 * 1000, max: 60, bucket: 'admin-actions' }))) return;
+  if (!(await requireAdmin(req, res))) return;
 
   try {
     const { action, payload = {} } = req.body || {};
+    const id = payload.id;
+    if (['approveEvent', 'updateEvent', 'deleteEvent', 'setPromoted'].includes(action) && !ID_RE.test(String(id || ''))) {
+      return res.status(400).json({ error: 'ID e pavlefshme' });
+    }
+    const byId = `events?id=eq.${encodeURIComponent(id)}`;
 
     switch (action) {
+      case 'listEvents': {
+        const rows = await sb('events?select=*&order=created_at.desc&limit=500');
+        return res.status(200).json({ events: (rows || []).map(toAppEvent) });
+      }
+
       case 'approveEvent': {
-        const { id, promote } = payload;
-        if (!id) return res.status(400).json({ error: 'Missing id' });
-        await sb(`events?id=eq.${encodeURIComponent(id)}`, {
+        await sb(byId, {
           method: 'PATCH',
           headers: { Prefer: 'return=minimal' },
-          body: JSON.stringify({ status: 'approved', is_promoted: !!promote }),
+          body: JSON.stringify({ status: 'approved', is_promoted: payload.promote === true }),
+        });
+        return res.status(200).json({ ok: true });
+      }
+
+      case 'setPromoted': {
+        await sb(byId, {
+          method: 'PATCH',
+          headers: { Prefer: 'return=minimal' },
+          body: JSON.stringify({ is_promoted: payload.promoted === true }),
         });
         return res.status(200).json({ ok: true });
       }
 
       case 'updateEvent': {
-        const { id, updates } = payload;
-        if (!id || !updates) return res.status(400).json({ error: 'Missing id/updates' });
-        const clean = { ...updates };
-        delete clean.id;
-        // Map camelCase app fields to the DB's snake_case columns
-        if ('isPromoted' in clean) { clean.is_promoted = clean.isPromoted; delete clean.isPromoted; }
-        if ('gallery' in clean) { clean.gallery_urls = clean.gallery; delete clean.gallery; }
-        await sb(`events?id=eq.${encodeURIComponent(id)}`, {
-          method: 'PATCH',
-          headers: { Prefer: 'return=minimal' },
-          body: JSON.stringify(clean),
-        });
+        // Whitelisted fields only — views/clicks/status/id can't be overwritten here.
+        const { row, error } = validateEventInput(payload.updates || {}, { partial: true, trustedImages: true });
+        if (error) return res.status(400).json({ error });
+        if (!Object.keys(row).length) return res.status(400).json({ error: 'Asgjë për të ndryshuar' });
+        await sbWriteTolerant(byId, 'PATCH', row);
         return res.status(200).json({ ok: true });
       }
 
       case 'deleteEvent': {
-        const { id } = payload;
-        if (!id) return res.status(400).json({ error: 'Missing id' });
-        await sb(`events?id=eq.${encodeURIComponent(id)}`, {
-          method: 'DELETE',
-          headers: { Prefer: 'return=minimal' },
-        });
+        await sb(byId, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+        return res.status(200).json({ ok: true });
+      }
+
+      case 'purgePastEvents': {
+        // Delete events that ended more than 30 days ago.
+        const cutoff = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+        await sb(`events?date=lt.${cutoff}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
         return res.status(200).json({ ok: true });
       }
 
       case 'changePassword': {
-        const { newPassword } = payload;
-        if (!newPassword || newPassword.length < 4) {
-          return res.status(400).json({ error: 'Password too short (min 4 chars)' });
+        const { currentPassword, newPassword } = payload;
+        const stored = await getStoredPassword();
+        if (!verifyPassword(String(currentPassword || ''), stored)) {
+          return res.status(400).json({ error: 'Fjalëkalimi aktual është i gabuar' });
         }
-        await sb('app_settings', {
-          method: 'POST',
-          headers: { Prefer: 'resolution=merge-duplicates' },
-          body: JSON.stringify({ key: 'admin_password', value: newPassword }),
-        });
+        if (typeof newPassword !== 'string' || newPassword.length < 12 || newPassword.length > 200) {
+          return res.status(400).json({ error: 'Fjalëkalimi i ri duhet të ketë të paktën 12 karaktere' });
+        }
+        await setStoredPassword(hashPassword(newPassword));
+        // All existing sessions (including this one) are now invalid — the client logs in again.
         return res.status(200).json({ ok: true });
       }
 
       default:
-        return res.status(400).json({ error: 'Unknown action' });
+        return res.status(400).json({ error: 'Veprim i panjohur' });
     }
   } catch (err) {
     console.error('admin-actions error:', err);
-    res.status(500).json({ error: 'Server error', debug: String(err?.message || err) });
+    return res.status(500).json({ error: 'Gabim në server' });
   }
 }
