@@ -344,7 +344,7 @@ function AppInner() {
       <Suspense fallback={selected ? <div className="fixed inset-0 z-[90] bg-night-bg" /> : null}>
         {selected && <EventDetails event={selected} saved={savedIds.has(selected.id)} onClose={closeEvent} onToggleSave={toggleSave} notify={notify} onOpenCollection={openCollection} going={goingIds.has(selected.id)} onToggleGoing={toggleGoing} onGoTogether={(e) => setTogetherSeed(e)} />}
         {togetherSeed && <TogetherBuilder seed={togetherSeed} events={events} onClose={() => setTogetherSeed(null)} onOpenPoll={openPoll} notify={notify} />}
-        {(view === 'home' || view === 'saved' || view === 'collection') && !selected && !togetherSeed && <EventChatWidget position="right" />}
+        {(view === 'home' || view === 'saved' || view === 'collection') && !selected && !togetherSeed && <EventChatWidget position="right" events={events} onOpenEvent={openEvent} />}
       </Suspense>
     </div>
   );

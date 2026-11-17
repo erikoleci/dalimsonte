@@ -216,11 +216,11 @@ const dict = {
   'footer.made': { sq: 'Bërë me ❤️ në Shqipëri', en: 'Made with ❤️ in Albania' },
 
   // chat
-  'chat.title': { sq: 'Guida e natës', en: 'Nightlife guide' },
+  'chat.title': { sq: 'Nata · guida jote e natës', en: 'Nata · your nightlife guide' },
   'chat.status': { sq: 'AI · të dhëna live', en: 'AI · live event data' },
   'chat.hello': {
-    sq: 'Hej! 🌙 Më thuaj qytetin, vibe-in ose buxhetin dhe të sugjeroj eventet më të mira për sonte.',
-    en: "Hey! 🌙 Tell me your city, vibe or budget and I'll suggest tonight's best events.",
+    sq: 'Hej, jam Nata 🌙 Më thuaj qytetin, vibe-in ose këngëtarin që do të shohësh dhe të gjej ku të dalësh.',
+    en: "Hey, I'm Nata 🌙 Tell me your city, your vibe or the artist you want to see and I'll find where to go.",
   },
   'chat.s1': { sq: 'Çfarë ka sonte në Tiranë?', en: "What's on tonight in Tirana?" },
   'chat.s2': { sq: 'Diçka falas këtë fundjavë?', en: 'Anything free this weekend?' },
