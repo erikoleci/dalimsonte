@@ -40,7 +40,11 @@ export const VenueForm: React.FC<{ onCancel: () => void }> = ({ onCancel }) => {
 
   const previews = useMemo(() => files.map((f) => URL.createObjectURL(f)), [files]);
   useEffect(() => () => previews.forEach((u) => URL.revokeObjectURL(u)), [previews]);
-  useEffect(() => window.scrollTo({ top: 0 }), [step]);
+  // Braces matter: newer Chrome returns a Promise from scrollTo, and an effect
+  // must not return anything except a cleanup function (it crashed on "back").
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [step]);
 
   const set = <K extends keyof ReturnType<typeof emptyForm>>(k: K, v: ReturnType<typeof emptyForm>[K]) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -121,7 +125,10 @@ export const VenueForm: React.FC<{ onCancel: () => void }> = ({ onCancel }) => {
             <Icon.WhatsApp />
           </span>
         </a>
-        <button onClick={reset} className="mt-8 text-sm text-night-muted underline-offset-4 hover:text-white hover:underline">
+        <button onClick={onCancel} className="btn-primary mt-8 w-full">
+          {t('venue.backHome')}
+        </button>
+        <button onClick={reset} className="mt-4 text-sm text-night-muted underline-offset-4 hover:text-white hover:underline">
           {t('venue.another')}
         </button>
       </div>

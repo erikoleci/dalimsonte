@@ -204,6 +204,7 @@ const dict = {
     en: "You requested Featured — message us on WhatsApp for payment and instant activation.",
   },
   'venue.adminContact': { sq: 'Kontakti ynë', en: 'Contact us' },
+  'venue.backHome': { sq: '← Kthehu në faqen kryesore', en: '← Back to home' },
   'venue.another': { sq: 'Publiko një event tjetër', en: 'Post another event' },
   'venue.cancel': { sq: 'Anulo', en: 'Cancel' },
   'venue.required': { sq: 'Plotëso fushat e detyrueshme', en: 'Fill in the required fields' },

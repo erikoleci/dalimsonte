@@ -14,7 +14,7 @@ const PollPage = lazy(() => import('./components/Together').then((m) => ({ defau
 const CollectionPage = lazy(() => import('./components/CollectionPage').then((m) => ({ default: m.CollectionPage })));
 const AdminPanel = lazy(() => import('./components/AdminPanel').then((m) => ({ default: m.AdminPanel })));
 const EventChatWidget = lazy(() => import('./components/EventChatWidget').then((m) => ({ default: m.EventChatWidget })));
-import { Icon, Toasts } from './components/ui';
+import { ErrorBoundary, Icon, Toasts } from './components/ui';
 
 type View = 'home' | 'saved' | 'venue' | 'admin' | 'collection' | 'poll';
 type Collection = { kind: 'venue' | 'artist'; name: string } | null;
@@ -269,6 +269,7 @@ function AppInner() {
         onInstall={install}
       />
 
+      <ErrorBoundary resetKey={`${view}:${collection?.name || ''}:${pollId || ''}`}>
       <main>
         {view === 'home' && (
           <>
@@ -336,6 +337,7 @@ function AppInner() {
           {view === 'admin' && <AdminPanel onExit={() => setView('home')} notify={notify} />}
         </Suspense>
       </main>
+      </ErrorBoundary>
 
       {view !== 'admin' && <Footer onPublish={() => setView('venue')} />}
 

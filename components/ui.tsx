@@ -137,6 +137,40 @@ export function Turnstile({ onToken }: { onToken: (t: string) => void }) {
   return <div ref={ref} className="min-h-[65px]" />;
 }
 
+/** Catches crashes in a part of the app and shows a way home instead of a black screen. */
+export class ErrorBoundary extends React.Component<{ children: React.ReactNode; resetKey?: string }, { error: boolean }> {
+  state = { error: false };
+  static getDerivedStateFromError() {
+    return { error: true };
+  }
+  componentDidCatch(err: unknown) {
+    console.error('UI error:', err);
+  }
+  componentDidUpdate(prev: { resetKey?: string }) {
+    if (prev.resetKey !== this.props.resetKey && this.state.error) this.setState({ error: false });
+  }
+  render() {
+    if (!this.state.error) return this.props.children;
+    const sq = (document.documentElement.lang || 'sq') === 'sq';
+    return (
+      <div className="flex min-h-[80svh] flex-col items-center justify-center px-6 pt-20 text-center">
+        <div className="mb-4 text-5xl">🌙</div>
+        <h2 className="font-display text-2xl font-bold text-white">{sq ? 'Diçka shkoi keq' : 'Something went wrong'}</h2>
+        <p className="mt-2 max-w-xs text-night-muted">{sq ? 'Provo përsëri ose kthehu në faqen kryesore.' : 'Try again or go back home.'}</p>
+        <button
+          onClick={() => {
+            window.location.hash = '';
+            window.location.reload();
+          }}
+          className="btn-primary mt-6"
+        >
+          {sq ? 'Kthehu në faqen kryesore' : 'Back to home'}
+        </button>
+      </div>
+    );
+  }
+}
+
 export function useLockBody(locked: boolean) {
   useEffect(() => {
     if (!locked) return;
